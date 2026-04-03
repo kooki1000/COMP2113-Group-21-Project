@@ -3,9 +3,36 @@
  * 
  * Main entry point and game loop for TermiCraft.
  * This file ties everything together - menus, world, player, minigames, boss.
- * 
- * The stub functions below are placeholders. Team members replace them
- * with their actual implementations.
+ * The stub functions below are placeholders. Everyone replace them with their actual implementations.
+
+ 
+     ==================================================================================== READ BEFORE CODING ======================================================================================
+     
+   - try staying in ur assigned lines so we dont have a nightmare integration/checking/merging later
+   - dont change the function names or params in the decls at the top (lines 31-52) or it wont build for anyone
+   - if u wanna change anything in types.h like adding blocks or items let us know on gc first since the save/load system depends on that
+   - dont touch the engine stuff or terminal setup (lines 500+) cuz that keeps the terminal from crashing unless any major changes are needed
+   - if ur part gets too huge, just make a new .cpp file and call the function from ur stub here
+
+ * MOHIT : Write your implementation between Lines 81 and 175.
+   Not DO: Don't use 'time(0)' to seed your randoms; use 'state.seed' so save/load actually works. Also, don't hardcode 80x40.
+   Update GC: If you're adding new blocks to the 'BlockType' enum or anything else
+   
+ * KOKI: Write your implementation between Lines 179 and 318.
+   Not DO: Don't move the player without checking if they're still inside worldWidth/Height. Don't auto-start minigames during mining. let them trigger from your crafting menu instead.
+   Update GC: If you need to add new items to the 'Inventory' or 'Player' structs or anything else
+   
+ * SOHAN: Write enemy logic between Lines 322–419 and the Boss Fight between Lines 421–435.
+   Not DO: Don't just set 'alive = false'; you have to actually '.erase()' dead enemies from the vector so the game doesn't lag. Don't hardcode damage; use the multiplier in 'state.settings'.
+   Update GC: If you want to change the 'Enemy' struct or anything else
+   
+ * ARYAN (Wordle/Sudoku) Lines 439–444
+   Not DO: Don't worry about terminal modes—don't call 'setupTerminal' or 'restoreTerminal'. The engine handles that for you. Don't forget to return true for a win or false for a loss.
+   Update GC: If your game needs to save high scores or ingame stats or different game or anything else
+   
+ * NAN (Minesweeper/Math) Lines 446–452.
+   DO/NOT DO: u can use the gridSize parameter to scale the difficulty.
+   Update GC: If you want to add custom variables for your games to types.h or change game or anything else.
  */
 
 #include <iostream>
@@ -55,13 +82,13 @@ bool runWordle(int wordLength);
 bool runMinesweeper(int gridSize);
 
 // ----- GLOBALS -----
-// Yeah globals are ugly but we need them for the signal handler
+// Need globals for the signal handler
 
 static GameState gameState;
 static bool gameRunning = true;
 static struct termios originalTermios;
 
-// Random number generator - way better than rand()
+// Random number generator - instead of rand() because rand() is trash
 static mt19937 rng;
 
 // ----- TERMINAL SETUP -----
@@ -263,7 +290,7 @@ void updateWorldVisibility(GameState& state) {
     }
 }
 
-// ===== KOKI: Player stuff =====
+// ===== KOKI: Player related stuff =====
 
 void initPlayer(GameState& state) {
     state.player.name = "Player";
