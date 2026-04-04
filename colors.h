@@ -6,7 +6,8 @@
  * 
  * Usage: cout << COLOR_RED << "Error!" << COLOR_RESET << endl;
  *
- *TEAMNOTE END/
+ *TEAMNOTE END
+ */
 
 #ifndef COLORS_H
 #define COLORS_H
