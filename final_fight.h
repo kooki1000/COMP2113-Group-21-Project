@@ -14,5 +14,14 @@
 #ifndef FINAL_FIGHT_H
 #define FINAL_FIGHT_H
 
+#include <string>
+ 
+// Arena dimensions
+#define ARENA_WIDTH       100   // total terminal columns
+#define ARENA_HEIGHT       35   // total terminal rows
+#define ARENA_INNER_W      98   // width inside the border walls
+#define PLAYER_ROW         29   // row where the player sprite sits (0-indexed)
+#define DRAGON_START_ROW    4   // top row of dragon art (below HUD border)
+
 
 #endif // FINAL_FIGHT_H
