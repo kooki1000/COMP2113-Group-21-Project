@@ -254,7 +254,11 @@ void renderWorld(const GameState& state) {
             
             // Just a regular block
             const Block& block = state.world[worldY][worldX];
-            frame << getBlockColor(block.type) << getBlockChar(block.type) << COLOR_RESET;
+            if (!block.visible) {
+                frame << COLOR_DIM << "?" << COLOR_RESET;
+            } else {
+                frame << getBlockColor(block.type) << getBlockChar(block.type) << COLOR_RESET;
+            }
         }
         
         frame << COLOR_CYAN << "│" << COLOR_RESET << "\n";
@@ -281,15 +285,30 @@ void renderWorld(const GameState& state) {
 }
 
 void updateWorldVisibility(GameState& state) {
-    // TODO: Mohit - implement fog of war if you want
-    // For now just make everything visible
-    for (int y = 0; y < state.worldHeight; y++) {
-        for (int x = 0; x < state.worldWidth; x++) {
-            state.world[y][x].visible = true;
+    int px = state.player.pos.x;
+    int py = state.player.pos.y;
+
+    // Radius shrinks underground and in caves
+    int radius = 5;
+    if (py > STONE_LEVEL) radius = 3;
+    if (py > DEEP_LEVEL)  radius = 2;
+
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            int wx = px + dx;
+            int wy = py + dy;
+
+            if (wx < 0 || wx >= state.worldWidth) continue;
+            if (wy < 0 || wy >= state.worldHeight) continue;
+
+            // Circular radius check
+            if (dx*dx + dy*dy <= radius*radius) {
+                state.world[wy][wx].visible = true;
+            }
         }
     }
+    // Note: visible stays true permanently once revealed
 }
-
 // ===== KOKI: Player related stuff =====
 
 void initPlayer(GameState& state) {
