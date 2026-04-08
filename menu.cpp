@@ -354,3 +354,80 @@ void showHowToPlay() {
 }
 
 // ----- GAME OVER -----
+
+void showGameOver(const GameState& state, bool isVictory) {
+    clearScreen();
+    
+    if (isVictory) {
+        showVictoryArt();
+    } else {
+        showDefeatArt();
+    }
+    
+    cout << "\n";
+    
+    // Stats box
+    cout << COLOR_CYAN;
+    cout << "                    ╔═══════════════════════════════════╗\n";
+    cout << "                    ║         FINAL STATISTICS          ║\n";
+    cout << "                    ╠═══════════════════════════════════╣\n";
+    cout << COLOR_RESET;
+    
+    cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
+    cout << "  Ores Mined:     " << setw(15) << state.oresMined;
+    cout << COLOR_CYAN << " ║\n";
+    
+    cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
+    cout << "  Enemies Killed: " << setw(15) << state.enemiesKilled;
+    cout << COLOR_CYAN << " ║\n";
+    
+    cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
+    cout << "  Best Pickaxe:   " << setw(15) << getMaterialName(state.player.equipment.pickaxe);
+    cout << COLOR_CYAN << " ║\n";
+    
+    cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
+    cout << "  Best Armor:     " << setw(15) << getMaterialName(state.player.equipment.armor);
+    cout << COLOR_CYAN << " ║\n";
+    
+    cout << COLOR_CYAN << "                    ╠═══════════════════════════════════╣\n";
+    
+    cout << COLOR_CYAN << "                    ║" << COLOR_BOLD_YELLOW;
+    cout << "  FINAL SCORE:    " << setw(15) << state.score;
+    cout << COLOR_CYAN << " ║\n";
+    
+    cout << COLOR_CYAN;
+    cout << "                    ╚═══════════════════════════════════╝\n";
+    cout << COLOR_RESET;
+    
+    cout << "\n" << COLOR_DIM << "                    Press any key to continue..." << COLOR_RESET;
+    getch();
+}
+
+// ----- UTILITY FUNCTIONS -----
+
+bool showConfirmation(const string& message) {
+    cout << "\n" << COLOR_WARNING << "    " << message << " (Y/N): " << COLOR_RESET;
+    char input = getch();
+    return (input == 'y' || input == 'Y');
+}
+
+void waitForKeypress() {
+    cout << COLOR_DIM << "\n    Press any key to continue..." << COLOR_RESET;
+    getch();
+}
+
+string getPlayerName(const string& prompt) {
+    cout << "\n" << COLOR_WHITE << "    " << prompt << ": " << COLOR_RESET;
+    
+    // Flush any leftover keypresses from the terminal buffer
+    // This prevents phantom newlines from auto-submitting the name
+    tcflush(STDIN_FILENO, TCIFLUSH);
+    cin.clear();
+    
+    string name;
+    getline(cin, name);
+    
+    if (name.empty()) name = "Player";
+    if (name.length() > 14) name = name.substr(0, 14);
+    return name;
+}
