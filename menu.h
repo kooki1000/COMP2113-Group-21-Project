@@ -1,6 +1,6 @@
 /*
  * menu.h
- * 
+ *
  * All the UI screens - main menu, difficulty select, game over, etc.
  * Also handles the in-game HUD (health bar, inventory display).
  */
@@ -8,9 +8,10 @@
 #ifndef MENU_H
 #define MENU_H
 
-#include "types.h"
 #include <string>
 #include <vector>
+
+#include "types.h"
 
 // ----- MAIN MENU STUFF -----
 
@@ -67,3 +68,5 @@ void showInventory(const GameState& state);
 
 // Show a status message at bottom of screen
 void showStatusMessage(const std::string& message, bool isError = false);
+
+#endif

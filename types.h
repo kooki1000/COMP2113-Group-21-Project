@@ -1,27 +1,27 @@
 /*
  * types.h
- * 
+ *
  * Shared data structures for TermiCraft - everyone includes this.
  * If you're adding new structs or enums, put them here so the whole team can use them.
- * 
+ *
  * DON'T modify existing structs without telling the group chat first.
  */
 
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <ctime>
 #include <string>
 #include <vector>
-#include <ctime>
 
 // ----- CONSTANTS -----
 
 // World size stuff
 const int WORLD_WIDTH = 80;
 const int WORLD_HEIGHT = 40;
-const int SURFACE_LEVEL = 8;      // ground starts here, sky above
-const int STONE_LEVEL = 12;       // stone layer begins
-const int DEEP_LEVEL = 25;        // rare ores spawn below this
+const int SURFACE_LEVEL = 8;  // ground starts here, sky above
+const int STONE_LEVEL = 12;   // stone layer begins
+const int DEEP_LEVEL = 25;    // rare ores spawn below this
 
 // Block types - used in the world grid
 enum BlockType {
@@ -80,7 +80,7 @@ enum GamePhase {
 struct Position {
     int x;
     int y;
-    
+
     Position() : x(0), y(0) {}
     Position(int _x, int _y) : x(_x), y(_y) {}
 };
@@ -88,9 +88,9 @@ struct Position {
 // Single block in the world
 struct Block {
     BlockType type;
-    bool mined;      // has this been dug out?
-    bool visible;    // can player see it? (fog of war)
-    
+    bool mined;    // has this been dug out?
+    bool visible;  // can player see it? (fog of war)
+
     Block() : type(BLOCK_AIR), mined(false), visible(false) {}
 };
 
@@ -102,9 +102,9 @@ struct Inventory {
     int iron;
     int gold;
     int diamond;
-    
+
     Inventory() : wood(0), stone(0), coal(0), iron(0), gold(0), diamond(0) {}
-    
+
     int total() const {
         return wood + stone + coal + iron + gold + diamond;
     }
@@ -114,7 +114,7 @@ struct Inventory {
 struct Equipment {
     MaterialTier pickaxe;
     MaterialTier armor;
-    
+
     Equipment() : pickaxe(MATERIAL_NONE), armor(MATERIAL_NONE) {}
 };
 
@@ -127,7 +127,7 @@ struct Player {
     Inventory inventory;
     Equipment equipment;
     bool alive;
-    
+
     Player() : name("Player"), health(100), maxHealth(100), alive(true) {}
 };
 
@@ -140,7 +140,7 @@ struct Enemy {
     int damage;
     bool alive;
     char symbol;
-    
+
     Enemy() : name("Bug"), health(20), maxHealth(20), damage(5), alive(true), symbol('B') {}
 };
 
@@ -148,16 +148,14 @@ struct Enemy {
 struct DifficultySettings {
     std::string name;
     int playerHealth;
-    int enemyHealthMult;     // percentage, 100 = normal
-    int oreSpawnRate;        // percentage, 100 = normal
-    int enemySpawnChance;    // % chance per mine action
+    int enemyHealthMult;   // percentage, 100 = normal
+    int oreSpawnRate;      // percentage, 100 = normal
+    int enemySpawnChance;  // % chance per mine action
     float scoreMultiplier;
-    int wordleWordLength;    // for Aryan's minigame
-    int minesweeperSize;     // grid size for Nan's minigame
-    
-    DifficultySettings() : name("Normal"), playerHealth(100), 
-        enemyHealthMult(100), oreSpawnRate(100), enemySpawnChance(15),
-        scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8) {}
+    int wordleWordLength;  // for Aryan's minigame
+    int minesweeperSize;   // grid size for Nan's minigame
+
+    DifficultySettings() : name("Normal"), playerHealth(100), enemyHealthMult(100), oreSpawnRate(100), enemySpawnChance(15), scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8) {}
 };
 
 // High score entry
@@ -167,9 +165,8 @@ struct HighScore {
     Difficulty difficulty;
     std::time_t timestamp;
     bool defeatedDragon;
-    
-    HighScore() : playerName("---"), score(0), difficulty(DIFF_EASY), 
-        timestamp(0), defeatedDragon(false) {}
+
+    HighScore() : playerName("---"), score(0), difficulty(DIFF_EASY), timestamp(0), defeatedDragon(false) {}
 };
 
 // The big one - entire game state lives here
@@ -179,53 +176,46 @@ struct GameState {
     GamePhase phase;
     Difficulty difficulty;
     DifficultySettings settings;
-    
+
     // World - dynamically allocated, see initWorld()
     Block** world;
     int worldWidth;
     int worldHeight;
-    
+
     // Player
     Player player;
-    
+
     // Enemies
     std::vector<Enemy> enemies;
-    
+
     // Dragon boss stuff
     bool dragonCaveFound;
     Position dragonCavePos;
     bool dragonDefeated;
-    
+
     // Score tracking
     int score;
     int oresMined;
     int enemiesKilled;
-    
+
     // Minigame state
     MinigameType currentMinigame;
     bool minigameActive;
     MaterialTier pendingUpgrade;
-    
+
     // Camera position (top-left corner of what we're showing)
     Position camera;
     int viewportWidth;
     int viewportHeight;
-    
+
     // Game over flags
     bool gameOver;
     bool victory;
-    std::string lastMessage;     // status text at bottom of screen
-    unsigned int seed;           // world gen seed for reproducibility
-    
-    GameState() : phase(PHASE_MENU), difficulty(DIFF_NORMAL), 
-        world(nullptr), worldWidth(WORLD_WIDTH), worldHeight(WORLD_HEIGHT),
-        dragonCaveFound(false), dragonDefeated(false),
-        score(0), oresMined(0), enemiesKilled(0),
-        currentMinigame(MINIGAME_NONE), minigameActive(false),
-        pendingUpgrade(MATERIAL_NONE),
-        viewportWidth(60), viewportHeight(20),
-        gameOver(false), victory(false), seed(0) {}
-    
+    std::string lastMessage;  // status text at bottom of screen
+    unsigned int seed;        // world gen seed for reproducibility
+
+    GameState() : phase(PHASE_MENU), difficulty(DIFF_NORMAL), world(nullptr), worldWidth(WORLD_WIDTH), worldHeight(WORLD_HEIGHT), dragonCaveFound(false), dragonDefeated(false), score(0), oresMined(0), enemiesKilled(0), currentMinigame(MINIGAME_NONE), minigameActive(false), pendingUpgrade(MATERIAL_NONE), viewportWidth(60), viewportHeight(20), gameOver(false), victory(false), seed(0) {}
+
     // IMPORTANT: Don't copy GameState by value!
     // The world pointer will get double-freed and crash everything.
     // Always pass by reference: void doStuff(GameState& state)
@@ -238,46 +228,74 @@ struct GameState {
 // Get the character to display for each block type
 inline char getBlockChar(BlockType type) {
     switch (type) {
-        case BLOCK_AIR:         return ' ';
-        case BLOCK_SKY:         return ' ';
-        case BLOCK_GRASS:       return '"';
-        case BLOCK_DIRT:        return '.';
-        case BLOCK_STONE:       return '#';
-        case BLOCK_COAL:        return 'C';
-        case BLOCK_IRON:        return 'I';
-        case BLOCK_GOLD:        return 'G';
-        case BLOCK_DIAMOND:     return 'D';
-        case BLOCK_WOOD:        return 'T';
-        case BLOCK_LEAVES:      return '*';
-        case BLOCK_BEDROCK:     return 'X';
-        case BLOCK_DRAGON_CAVE: return '!';
-        default:                return '?';
+        case BLOCK_AIR:
+            return ' ';
+        case BLOCK_SKY:
+            return ' ';
+        case BLOCK_GRASS:
+            return '"';
+        case BLOCK_DIRT:
+            return '.';
+        case BLOCK_STONE:
+            return '#';
+        case BLOCK_COAL:
+            return 'C';
+        case BLOCK_IRON:
+            return 'I';
+        case BLOCK_GOLD:
+            return 'G';
+        case BLOCK_DIAMOND:
+            return 'D';
+        case BLOCK_WOOD:
+            return 'T';
+        case BLOCK_LEAVES:
+            return '*';
+        case BLOCK_BEDROCK:
+            return 'X';
+        case BLOCK_DRAGON_CAVE:
+            return '!';
+        default:
+            return '?';
     }
 }
 
 // Get readable name for material tier
 inline std::string getMaterialName(MaterialTier tier) {
     switch (tier) {
-        case MATERIAL_NONE:    return "None";
-        case MATERIAL_WOOD:    return "Wood";
-        case MATERIAL_STONE:   return "Stone";
-        case MATERIAL_IRON:    return "Iron";
-        case MATERIAL_GOLD:    return "Gold";
-        case MATERIAL_DIAMOND: return "Diamond";
-        default:               return "Unknown";
+        case MATERIAL_NONE:
+            return "None";
+        case MATERIAL_WOOD:
+            return "Wood";
+        case MATERIAL_STONE:
+            return "Stone";
+        case MATERIAL_IRON:
+            return "Iron";
+        case MATERIAL_GOLD:
+            return "Gold";
+        case MATERIAL_DIAMOND:
+            return "Diamond";
+        default:
+            return "Unknown";
     }
 }
 
 // Points you get for mining each block type
 inline int getBlockScore(BlockType type) {
     switch (type) {
-        case BLOCK_WOOD:    return 1;
-        case BLOCK_STONE:   return 2;
-        case BLOCK_COAL:    return 2;
-        case BLOCK_IRON:    return 3;
-        case BLOCK_GOLD:    return 4;
-        case BLOCK_DIAMOND: return 5;
-        default:            return 0;
+        case BLOCK_WOOD:
+            return 1;
+        case BLOCK_STONE:
+            return 2;
+        case BLOCK_COAL:
+            return 2;
+        case BLOCK_IRON:
+            return 3;
+        case BLOCK_GOLD:
+            return 4;
+        case BLOCK_DIAMOND:
+            return 5;
+        default:
+            return 0;
     }
 }
 
