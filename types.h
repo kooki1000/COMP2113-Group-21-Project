@@ -127,6 +127,8 @@ struct Player {
     Inventory inventory;
     Equipment equipment;
     bool alive;
+    int facingX;  // -1, 0, or 1
+    int facingY;  // -1, 0, or 1 (default 1 for facing down)
 
     Player() : name("Player"), health(100), maxHealth(100), alive(true) {}
 };
