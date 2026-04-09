@@ -60,4 +60,15 @@
 #define ARROW_DMG_GOLD      5
 #define ARROW_DMG_DIAMOND   8
 
+// Difficulty codes
+// Passed in from main.cpp (Saarim's module)
+#define DIFF_EASY          0
+#define DIFF_NORMAL        1
+#define DIFF_HARD          2
+ 
+// Base player HP per difficulty (before armor bonus is applied)
+#define BASE_HP_EASY       40
+#define BASE_HP_NORMAL     30
+#define BASE_HP_HARD       20
+
 #endif // FINAL_FIGHT_H
