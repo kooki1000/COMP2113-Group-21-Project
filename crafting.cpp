@@ -1,3 +1,32 @@
+// =============================================================================
+// crafting.cpp
+// TermiCraft — Crafting & Inventory System Module Implementation
+//
+// Implements the crafting and inventory system for TermiCraft. This module
+// provides a full-screen terminal UI for the crafting bench and detailed
+// inventory display, with real-time validation of resource requirements and
+// equipment prerequisites.
+//
+// The implementation features:
+// - A scrolling menu of 10 recipes (5 tiers × 2 equipment types)
+// - Color-coded availability (green=craftable, yellow=visible, red=locked)
+// - Sidebar showing current inventory and equipment status
+// - Detailed cost breakdown and error messages for failed crafts
+// - Health bonuses when upgrading armor (+5 to +25 HP per tier)
+//
+// The crafting loop uses single-character input (W/S/ENTER/Q) for navigation
+// and integrates with the existing termios-based getch() function from menu.h.
+// When a recipe triggers a minigame (Iron, Gold, or Diamond tiers), the function
+// returns immediately, allowing the main loop to transition to PHASE_MINIGAME.
+//
+// Compilation requires linking with the existing colors.h and menu.h modules.
+// No external libraries beyond the standard C++ library are needed.
+//
+// Author:       Koki
+// Dependencies: crafting.h, colors.h, menu.h, player.h, <iostream>, <iomanip>,
+//               <algorithm>, <unistd.h> for usleep()
+// =============================================================================
+
 #include "crafting.h"
 
 #include <unistd.h>
