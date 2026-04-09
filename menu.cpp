@@ -19,7 +19,7 @@
 // ----- INPUT HELPERS -----
 
 // Read a single keypress without waiting for Enter
-static char getch() {
+char getch() {
     struct termios oldattr, newattr;
     char ch;
     tcgetattr(STDIN_FILENO, &oldattr);

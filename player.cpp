@@ -29,6 +29,7 @@
 #include <iostream>
 
 #include "colors.h"
+#include "crafting.h"
 #include "menu.h"
 
 // Initialize player at the dragon carcass spawn point
@@ -331,13 +332,7 @@ void handleInput(GameState& state, char input) {
 
         case 'c':
         case 'C': {  // Crafting
-            if (showCraftingMenu(state)) {
-                // If crafting succeeded, check for minigame trigger
-                if (checkCraftingProgression(state)) {
-                    state.phase = PHASE_MINIGAME;
-                    state.minigameActive = true;
-                }
-            }
+            openCraftingMenu(state);
             break;
         }
 

@@ -1,11 +1,13 @@
 #include "crafting.h"
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
 
 #include "colors.h"
-#include "menu.h"    // For clearScreen()
+#include "menu.h"    // For getch() and clearScreen()
 #include "player.h"  // For checkCraftingProgression() and healPlayer()
 
 // Recipe definitions matching the progression chart
@@ -269,7 +271,57 @@ void openCraftingMenu(GameState& state) {
     while (true) {
         renderCraftingUI(state, selected);
 
-        // TODO: Add interactivity based on the user input
+        char input = getch();
+
+        switch (input) {
+            case 'w':
+            case 'W':
+                // Move up to previous visible recipe, wrap around
+                do {
+                    selected = (selected - 1 + NUM_RECIPES) % NUM_RECIPES;
+                } while (!isRecipeVisible(state, RECIPES[selected]) && selected > 0);
+                break;
+
+            case 's':
+            case 'S':
+                // Move down to next visible recipe, stop at last visible
+                do {
+                    selected = (selected + 1) % NUM_RECIPES;
+                } while (!isRecipeVisible(state, RECIPES[selected]) && selected < NUM_RECIPES - 1);
+                // If we wrapped to invisible ones, go back to first visible
+                if (!isRecipeVisible(state, RECIPES[selected])) {
+                    for (int i = 0; i < NUM_RECIPES; i++) {
+                        if (isRecipeVisible(state, RECIPES[i])) {
+                            selected = i;
+                            break;
+                        }
+                    }
+                }
+                break;
+
+            case '\n':
+            case '\r':
+            case ' ':
+                // Attempt craft
+                if (canCraft(state, RECIPES[selected])) {
+                    bool minigameTriggered = performCrafting(state, RECIPES[selected]);
+                    if (minigameTriggered) {
+                        // Minigame was triggered, exit menu immediately
+                        // Main loop will detect state.minigameActive and state.phase
+                        return;
+                    }
+                    // Small delay to show success message
+                    usleep(500000);  // 500ms
+                } else {
+                    // Error flash
+                    std::cout << "\a";  // Bell
+                }
+                break;
+
+            case 'q':
+            case 'Q':
+                return;  // Exit to game
+        }
     }
 }
 
@@ -348,5 +400,5 @@ void showInventory(const GameState& state) {
     std::cout << COLOR_RESET;
 
     std::cout << COLOR_DIM << "\n    Press any key to continue..." << COLOR_RESET;
-    // getch();
+    getch();
 }

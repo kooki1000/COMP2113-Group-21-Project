@@ -40,6 +40,9 @@ void waitForKeypress();
 // Ask player to type their name
 std::string getPlayerName(const std::string& prompt);
 
+// Read a single keypress without waiting for Enter
+char getch();
+
 // ----- ASCII ART -----
 
 // Big fancy title banner
@@ -58,10 +61,6 @@ void showBox(const std::vector<std::string>& lines, int width = 50);
 
 // Draw the HUD at top of screen (health, inventory, etc)
 void renderHUD(const GameState& state);
-
-// Open the crafting menu
-// Returns true if they crafted something
-bool showCraftingMenu(GameState& state);
 
 // Show detailed inventory screen
 void showInventory(const GameState& state);
