@@ -42,5 +42,70 @@
 #include <algorithm>      // std::max, std::min
 #include <fcntl.h>        // fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <unistd.h>       // usleep, read, STDIN_FILENO
+// =============================================================================
+// Dragon ASCII art — 3 phase variants
+//
+// The dragon is drawn as a 12-line block. Only two lines differ between phases:
+//   Line 3 (eyes):  "@ @" (P1) → "x @" (P2) → "x x" (P3)
+//   Line 5 (mouth): "\VV/"     → "\VV/"      → "\XX/"
+//
+// The entire block shifts horizontally each tick to animate movement.
+// Every backslash in the art is doubled (\\) as required by C strings.
+// =============================================================================
+
+// Phase 1 — full health, 100 % to 67 %: eyes @ @, mouth \VV/
+static const char* DRAGON_P1[FF_DRAGON_ROWS] = {
+    "        ,     \\    /      ,        ",
+    "       / \\    )\\__/(     / \\       ",
+    "      /   \\  (_\\  /_)   /   \\      ",
+    " ____/_____\\__\\@ @/___/_____\\____  ",
+    "|             |\\../|              |",
+    "|              \\VV/               |",
+    "|        ----------------         |",
+    "|_________________________________|",
+    " |    /\\ /      \\\\       \\ /\\    |",
+    " |  /   V        ))       V   \\  |",
+    " |/     `       //        '     \\|",
+    " `              V                `"
+};
+
+// Phase 2 — damaged, 66 % to 34 %: one eye becomes 'x', mouth still \VV/
+static const char* DRAGON_P2[FF_DRAGON_ROWS] = {
+    "        ,     \\    /      ,        ",
+    "       / \\    )\\__/(     / \\       ",
+    "      /   \\  (_\\  /_)   /   \\      ",
+    " ____/_____\\__\\x @/___/_____\\____  ",
+    "|             |\\../|              |",
+    "|              \\VV/               |",
+    "|        ----------------         |",
+    "|_________________________________|",
+    " |    /\\ /      \\\\       \\ /\\    |",
+    " |  /   V        ))       V   \\  |",
+    " |/     `       //        '     \\|",
+    " `              V                `"
+};
+
+// Phase 3 — near death, 33 % to 0 %: both eyes 'x', mouth breaks to \XX/
+static const char* DRAGON_P3[FF_DRAGON_ROWS] = {
+    "        ,     \\    /      ,        ",
+    "       / \\    )\\__/(     / \\       ",
+    "      /   \\  (_\\  /_)   /   \\      ",
+    " ____/_____\\__\\x x/___/_____\\____  ",
+    "|             |\\../|              |",
+    "|              \\XX/               |",
+    "|        ----------------         |",
+    "|_________________________________|",
+    " |    /\\ /      \\\\       \\ /\\    |",
+    " |  /   V        ))       V   \\  |",
+    " |/     `       //        '     \\|",
+    " `              V                `"
+};
+
+// Lookup table: DRAGON_ART[phase-1][row] → the correct line string
+static const char** DRAGON_ART[3] = {
+    (const char**)DRAGON_P1,
+    (const char**)DRAGON_P2,
+    (const char**)DRAGON_P3
+};
 
 using namespace std;
