@@ -36,8 +36,15 @@ void updatePhysics(GameState& state);
 // Attempt to move player by (dx, dy). Returns true if move succeeded.
 bool movePlayer(GameState& state, int dx, int dy);
 
-// Mine the block the player is facing (using facingX/facingY)
-void mineFacingBlock(GameState& state);
+// Initiate mining attempt (validates target, then triggers minigame)
+void initiateMining(GameState& state);
+
+// Complete the mining attempt after minigame finishes
+// Called by main.cpp with result from minigame module
+void resolveMiningAttempt(GameState& state, bool minigameWon);
+
+// Pick random minigame type (uses MINIGAME_COUNT constant)
+void selectRandomMinigame(GameState& state);
 
 // Check if current tool can mine a specific block type
 bool canPlayerMine(const GameState& state, BlockType block);
@@ -51,7 +58,7 @@ bool isSolidBlock(BlockType type);
 // Adjust camera position to center on player (clamped to world bounds)
 void updateCamera(GameState& state);
 
-// Damage/healing handlers
+// Damage/healing handlers (damage now used for minigame failure)
 void damagePlayer(GameState& state, int amount);
 void healPlayer(GameState& state, int amount);
 
@@ -65,9 +72,6 @@ bool checkCraftingProgression(GameState& state);
 
 // Confirm upgrade after minigame victory (called by main.cpp)
 void confirmUpgrade(GameState& state);
-
-// Enemy spawn roll (called after successful mine)
-void trySpawnEnemy(GameState& state, Position minedPos);
 
 // Get color code for player based on armor tier
 const char* getPlayerArmorColor(const GameState& state);
