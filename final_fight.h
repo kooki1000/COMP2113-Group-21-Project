@@ -111,4 +111,137 @@
 
 // Game tick duration in microseconds (50 ms = 20 ticks per second)
 #define FF_TICK_US     50000
+
+// -----------------------------------------------------------------------------
+// Structs  (HighScore, Difficulty, MaterialTier already in types.h)
+// -----------------------------------------------------------------------------
+
+/*
+ * BossConfig
+ *
+ * Difficulty-specific parameters for the boss fight.
+ * Built once by initBossConfig() at fight start, never modified during the fight.
+ */
+struct BossConfig {
+    int dragonHp;        // dragon starting HP
+    int fireballDmg;     // HP removed from player per fireball hit
+    int fireRateTicks;   // ticks between fireball volleys
+    int dragonSpeed;     // base columns dragon moves per tick
+};
+
+/*
+ * Dragon
+ *
+ * Live state of the dragon enemy throughout the fight.
+ * The full ASCII art block moves as a single unit: only x changes per tick.
+ * y is always FF_DRAGON_TOP_ROW.
+ */
+struct Dragon {
+    int x;           // column of the block's left edge
+    int y;           // row of the block's top edge (fixed = FF_DRAGON_TOP_ROW)
+    int hp;          // current HP
+    int maxHp;       // starting HP, used for phase threshold checks
+    int speed;       // columns moved per tick (increases at phase transitions)
+    int direction;   // +1 = moving right, -1 = moving left
+    int phase;       // current phase: FF_PHASE1, FF_PHASE2, or FF_PHASE3
+};
+
+/*
+ * Fireball
+ *
+ * One downward projectile fired by the dragon.
+ * The fireballs[] pool recycles inactive slots without reallocating.
+ */
+struct Fireball {
+    int  x;          // current column
+    int  y;          // current row
+    bool active;     // true = in flight and should be rendered + checked
+    int  dx;         // horizontal drift per tick: 0 (straight), -1 or +1 (spread)
+};
+
+/*
+ * Arrow
+ *
+ * One upward projectile fired by the player.
+ * Rapid fire: multiple arrows can be active simultaneously (up to FF_MAX_ARROWS).
+ */
+struct Arrow {
+    int  x;          // current column
+    int  y;          // current row
+    bool active;     // true = in flight
+};
+
+// -----------------------------------------------------------------------------
+// Public function declarations
+// -----------------------------------------------------------------------------
+
+/*
+ * runBossFight
+ *
+ * Main entry point. Called from main.cpp when the player enters the dragon cave.
+ * Manages: intro screen, game loop, score breakdown, name entry, high score
+ * save via fileio's addHighScore(), and sets state.phase before returning.
+ *
+ * Score is added to state.score in real time throughout the fight.
+ * Every addition is: state.score += (int)(rawPoints * state.settings.scoreMultiplier)
+ *
+ * Inputs:  state — full GameState (reads: score, difficulty, settings, armor)
+ *                                 (writes: score, phase, dragonDefeated)
+ * Outputs: true  = dragon defeated → state.phase set to PHASE_VICTORY
+ *          false = player died     → state.phase set to PHASE_GAMEOVER
+ *          Partial scores (death mid-fight) are still saved to the leaderboard.
+ */
+bool runBossFight(GameState& state);
+
+/*
+ * initBossConfig
+ *
+ * Builds the difficulty-specific BossConfig from a Difficulty enum value.
+ *
+ * Inputs:  diff — DIFF_EASY, DIFF_NORMAL, or DIFF_HARD (from types.h)
+ * Outputs: BossConfig fully populated for that difficulty
+ *
+ * Tick timing reference (FF_TICK_US = 50 ms per tick):
+ *   Easy:   fireRateTicks=40  ≈ 2.0 s between volleys, dragonSpeed=1
+ *   Normal: fireRateTicks=24  ≈ 1.2 s,                 dragonSpeed=2
+ *   Hard:   fireRateTicks=14  ≈ 0.7 s,                 dragonSpeed=3
+ */
+BossConfig initBossConfig(Difficulty diff);
+
+/*
+ * calcFightHP
+ *
+ * Computes the player's starting HP for the boss fight.
+ * Formula: baseHP (from difficulty) + flat armorBonus.
+ * No cap — armor always adds on top regardless of difficulty.
+ *
+ * Inputs:
+ *   diff  — DIFF_EASY / DIFF_NORMAL / DIFF_HARD (base: 40 / 30 / 20)
+ *   armor — MaterialTier from types.h (MATERIAL_NONE through MATERIAL_DIAMOND)
+ * Outputs: int — total starting HP
+ *
+ * Examples:
+ *   calcFightHP(DIFF_EASY,   MATERIAL_DIAMOND) → 40 + 30 = 70
+ *   calcFightHP(DIFF_NORMAL, MATERIAL_GOLD)    → 30 + 22 = 52
+ *   calcFightHP(DIFF_HARD,   MATERIAL_IRON)    → 20 + 15 = 35
+ *   calcFightHP(DIFF_HARD,   MATERIAL_NONE)    → 20 +  0 = 20
+ */
+int calcFightHP(Difficulty diff, MaterialTier armor);
+
+/*
+ * calcArmorDamage
+ *
+ * Returns damage dealt to the dragon per arrow hit, based on armor tier.
+ *
+ * Inputs:  armor — MaterialTier (MATERIAL_NONE through MATERIAL_DIAMOND)
+ * Outputs: int — damage per hit
+ *            NONE / WOOD / STONE → 1
+ *            IRON                → 3
+ *            GOLD                → 5
+ *            DIAMOND             → 8
+ */
+int calcArmorDamage(MaterialTier armor);
+
+#endif // FINAL_FIGHT_H
+
 #endif // FINAL_FIGHT_H
