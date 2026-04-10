@@ -28,7 +28,8 @@
 // =============================================================================
 
 #include "final_fight.h"
-#include "fileio.h"       // addHighScore(), getTopHighScore()
+#include "score.h"        // addScore(), saveFinalScore() — centralised scoring
+#include "fileio.h"       // getTopHighScore() used in showScoreBreakdown()
 #include "menu.h"         // getPlayerName(), waitForKeypress()
 #include "colors.h"       // COLOR_* defines, clearScreen()
 
