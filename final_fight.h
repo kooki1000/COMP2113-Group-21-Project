@@ -3,72 +3,112 @@
 // TermiCraft — Final Boss Fight Module Header
 //
 // Declares all constants, structs, and functions for the Space Invaders-style
-// dragon boss fight. This module handles the full fight sequence: arena
-// rendering, dragon movement, fireball and arrow mechanics, phase transitions,
-// scoring, name entry, and high score persistence.
+// dragon boss fight. Fully integrated with the team's shared types.h, fileio.h,
+// menu.h, and colors.h. Does NOT redefine Difficulty, MaterialTier, HighScore,
+// or HIGHSCORE_FILE — all are taken from the team's existing headers.
+//
+// Arena:     100 x 35 terminal columns/rows
+// Rendering: ANSI escape codes via colors.h (no ncurses, no extra install)
+// Input:     Non-blocking via fcntl(O_NONBLOCK) + read() from <fcntl.h>/<unistd.h>
+// Score:     Added to state.score in real time, every increment multiplied by
+//            state.settings.scoreMultiplier (from types.h DifficultySettings)
 //
 // Author:       Sohan
-// Dependencies: ncurses (compile with -lncurses), <unistd.h> for usleep()
+// Dependencies: types.h, fileio.h, menu.h, colors.h
+//               <fcntl.h>, <unistd.h> — standard on Linux, no extra install
 // =============================================================================
 
 #ifndef FINAL_FIGHT_H
 #define FINAL_FIGHT_H
 
-#include <string>
- 
+#include "types.h"   // GameState, Difficulty, MaterialTier — use team's definitions
+
+// -----------------------------------------------------------------------------
 // Arena dimensions
-#define ARENA_WIDTH       100   // total terminal columns
-#define ARENA_HEIGHT       35   // total terminal rows
-#define ARENA_INNER_W      98   // width inside the border walls
-#define PLAYER_ROW         29   // row where the player sprite sits (0-indexed)
-#define DRAGON_START_ROW    4   // top row of dragon art (below HUD border)
+// -----------------------------------------------------------------------------
+#define FF_ARENA_WIDTH     100   // total terminal columns
+#define FF_ARENA_HEIGHT     35   // total terminal rows
 
+// -----------------------------------------------------------------------------
 // Dragon art dimensions
-#define DRAGON_ROWS        12   // number of lines in the dragon ASCII block
-#define DRAGON_COLS        36   // rendered width of the widest dragon line
-#define DRAGON_MIN_X        1   // leftmost column the dragon left-edge can reach
-#define DRAGON_MAX_X       63   // rightmost (ARENA_WIDTH - DRAGON_COLS - 1)
+// -----------------------------------------------------------------------------
+#define FF_DRAGON_ROWS      12   // lines in the ASCII dragon block
+#define FF_DRAGON_COLS      35   // width of the widest dragon line
 
-// Projectile limits
-#define MAX_FIREBALLS      12   // maximum simultaneous fireballs on screen
-#define MAX_ARROWS         10   // maximum simultaneous player arrows on screen
- 
+// -----------------------------------------------------------------------------
+// Dragon movement bounds
+// Left edge min = 2  (clears left border at col 0)
+// Left edge max = 63 (right edge = 63+35 = 98, border at col 99)
+// -----------------------------------------------------------------------------
+#define FF_DRAGON_MIN_X      2
+#define FF_DRAGON_MAX_X     63
 
-// High score
-#define MAX_NAME_LEN       12   // maximum player name characters
-#define HIGHSCORE_FILE     "highscore.txt"
- 
-// Armor level codes
-// Passed in from player.cpp (Koki's module) as armorLevel int
-#define ARMOR_NONE         0
-#define ARMOR_STONE        1
-#define ARMOR_IRON         2
-#define ARMOR_GOLD         3
-#define ARMOR_DIAMOND      4
- 
-// HP added to base difficulty HP per armor level (same on all difficulties)
-#define HP_BONUS_NONE       0
-#define HP_BONUS_STONE      8
-#define HP_BONUS_IRON      15
-#define HP_BONUS_GOLD      22
-#define HP_BONUS_DIAMOND   30
- 
-// Damage dealt to the dragon per arrow hit, per armor level
-#define ARROW_DMG_NONE      1
-#define ARROW_DMG_STONE     1
-#define ARROW_DMG_IRON      3
-#define ARROW_DMG_GOLD      5
-#define ARROW_DMG_DIAMOND   8
+// -----------------------------------------------------------------------------
+// Arena row layout  (rows 0-33 active; row 34 is a blank safety buffer)
+// -----------------------------------------------------------------------------
+#define FF_HUD_ROW           1   // score + dragon HP bar
+#define FF_HUD_SEP_ROW       2   // separator under HUD
+#define FF_DRAGON_TOP_ROW    3   // first row of dragon art
+#define FF_PLAYER_ROW       29   // row the player sprite sits on
+#define FF_HP_ROW           30   // player HP bar display
+#define FF_CTRL_SEP_ROW     31   // separator above controls
+#define FF_CTRL_ROW         32   // controls hint line
+#define FF_BOT_ROW          33   // bottom border
 
-// Difficulty codes
-// Passed in from main.cpp (Saarim's module)
-#define DIFF_EASY          0
-#define DIFF_NORMAL        1
-#define DIFF_HARD          2
- 
-// Base player HP per difficulty (before armor bonus is applied)
-#define BASE_HP_EASY       40
-#define BASE_HP_NORMAL     30
-#define BASE_HP_HARD       20
+// -----------------------------------------------------------------------------
+// Projectile pool sizes
+// -----------------------------------------------------------------------------
+#define FF_MAX_FIREBALLS    12   // maximum simultaneous fireballs
+#define FF_MAX_ARROWS       10   // maximum simultaneous arrows (rapid fire)
 
+// -----------------------------------------------------------------------------
+// Boss fight base HP (local to this fight, independent of state.player.health)
+// Formula: calcFightHP(difficulty, armor) = baseHP + armorBonus
+// Base HP per difficulty:
+// -----------------------------------------------------------------------------
+#define FF_BASE_HP_EASY     40
+#define FF_BASE_HP_NORMAL   30
+#define FF_BASE_HP_HARD     20
+
+// Flat armor HP bonus added on top of base — same value on all difficulties
+#define FF_HP_BONUS_STONE    8
+#define FF_HP_BONUS_IRON    15
+#define FF_HP_BONUS_GOLD    22
+#define FF_HP_BONUS_DIAMOND 30
+
+// -----------------------------------------------------------------------------
+// Arrow damage to dragon per hit, by MaterialTier (from types.h)
+// MATERIAL_NONE=0, MATERIAL_WOOD=1, MATERIAL_STONE=2 → 1 dmg
+// MATERIAL_IRON=3 → 3, MATERIAL_GOLD=4 → 5, MATERIAL_DIAMOND=5 → 8
+// -----------------------------------------------------------------------------
+#define FF_DMG_DEFAULT   1
+#define FF_DMG_IRON      3
+#define FF_DMG_GOLD      5
+#define FF_DMG_DIAMOND   8
+
+// -----------------------------------------------------------------------------
+// Phase thresholds (% of dragon.maxHp remaining when phase transition triggers)
+// -----------------------------------------------------------------------------
+#define FF_PHASE2_PCT    66   // Phase 2 triggers at or below 66 %
+#define FF_PHASE3_PCT    33   // Phase 3 triggers at or below 33 %
+
+#define FF_PHASE1         1
+#define FF_PHASE2         2
+#define FF_PHASE3         3
+
+// -----------------------------------------------------------------------------
+// Score per arrow hit per phase — RAW value before scoreMultiplier
+// state.settings.scoreMultiplier (1.0 / 1.5 / 2.0) is applied on every add
+// -----------------------------------------------------------------------------
+#define FF_SCORE_HIT_P1  10
+#define FF_SCORE_HIT_P2  20
+#define FF_SCORE_HIT_P3  30
+#define FF_SCORE_KILL   500   // bonus when dragon HP reaches 0
+
+// Fireball horizontal spread offsets per phase
+#define FF_SPREAD_P2      3   // phase 2: two fireballs at centre ± 3 cols
+#define FF_SPREAD_P3      5   // phase 3: outer fireballs at centre ± 5 cols
+
+// Game tick duration in microseconds (50 ms = 20 ticks per second)
+#define FF_TICK_US     50000
 #endif // FINAL_FIGHT_H
