@@ -14,8 +14,9 @@
 //   open or write any files directly — fileio.cpp owns all file operations.
 //
 // Name entry delegation:
-//   saveFinalScore() calls menu.h's getPlayerName() for the prompt.
-//   score.cpp does not implement its own input handling.
+//   saveFinalScore() uses state.player.name directly — the player already
+//   entered their name at game start via main.cpp's getPlayerName() call.
+//   No second name prompt is shown.
 //
 // Author:       Sohan
 // Dependencies: types.h, fileio.h, menu.h
@@ -54,15 +55,15 @@ void addScore(GameState& state, int rawPoints);
 // saveFinalScore
 //
 // Called once at the end of a run — either victory or death in the boss fight.
-// Prompts the player for their name via getPlayerName() (menu.h),
-// builds a HighScore struct, and passes it to addHighScore() (fileio.h).
+// Uses state.player.name directly (set at game start by main.cpp — no second
+// prompt). Builds a HighScore struct and passes it to addHighScore() (fileio.h).
 // addHighScore() handles top-10 sorting and the actual file write.
 //
 // Partial scores from a death mid-fight are eligible — this function is
 // always called regardless of win or loss, so no score is ever discarded.
 //
 // Inputs:
-//   state          - full GameState (reads score, difficulty, player name)
+//   state          - full GameState (reads score, difficulty, player.name)
 //   defeatedDragon - true if the dragon was killed (sets HighScore.defeatedDragon)
 //                    false if player died or quit mid-fight
 // Outputs: none
