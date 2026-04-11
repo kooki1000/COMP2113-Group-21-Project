@@ -243,5 +243,3 @@ int calcFightHP(Difficulty diff, MaterialTier armor);
 int calcArmorDamage(MaterialTier armor);
 
 #endif // FINAL_FIGHT_H
-
-#endif // FINAL_FIGHT_H
