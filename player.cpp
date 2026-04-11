@@ -1,3 +1,26 @@
+// =============================================================================
+// player.cpp
+// TermiCraft — Player & Crafting System Module Implementation
+//
+// Implements the player controller and crafting system for TermiCraft. Handles
+// real-time keyboard input for movement (WASD), mining (SPACE), and crafting (C),
+// with full collision detection against the procedurally generated world grid.
+//
+// The module enforces the strict progression system: Wood → Stone → Iron → Gold
+// -> Diamond, where each tier upgrade after Stone requires completing a minigame
+// (Wordle for Iron, Minesweeper for Gold) to simulate the "rite of passage"
+// described in the game lore. Mining triggers enemy spawns based on difficulty
+// settings and depth (Zombies above ground, Cave Bugs below).
+//
+// Physics includes simple gravity simulation causing the player to fall when
+// standing over air blocks. The camera system tracks player movement with
+// clamping to world boundaries.
+//
+// Author:       Koki
+// Dependencies: player.h, colors.h, menu.h, <algorithm>, <cstdlib>, <ctime>,
+//               <iostream>
+// =============================================================================
+
 #include "player.h"
 
 #include <algorithm>

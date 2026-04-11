@@ -1,3 +1,22 @@
+// =============================================================================
+// player.h
+// TermiCraft — Player & Crafting System Module Header
+//
+// Declares all functions, constants, and interfaces for the player entity
+// and crafting progression system. This module manages player state including
+// position, health, inventory, and equipped tools/armor across the game world.
+//
+// Key responsibilities:
+// - Player initialization and spawn point location (dragon carcass)
+// - Movement and collision detection against world blocks
+// - Mining mechanics with tier-based tool requirements
+// - Crafting resource validation and consumption
+// - Minigame trigger logic for equipment progression (Iron/Gold/Diamond)
+//
+// Author:       Koki
+// Dependencies: types.h, string
+// =============================================================================
+
 #ifndef PLAYER_H
 #define PLAYER_H
 
