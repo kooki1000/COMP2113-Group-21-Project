@@ -11,7 +11,7 @@
 //   Guards against negative rawPoints so a buggy caller cannot reduce score.
 //
 // saveFinalScore():
-//   Uses state.player.name directly
+//   Prompts for player name via menu.h's getPlayerName().
 //   Builds a HighScore struct from current GameState.
 //   Delegates to fileio's addHighScore() for top-10 sorting + disk write.
 //   Returns after printing a one-line confirmation to the player.
@@ -31,7 +31,7 @@
 #include <iostream>
 #include <ctime>       // time() for HighScore.timestamp
 
-//using namespace std;
+using namespace std;
 
 // =============================================================================
 // addScore
@@ -84,9 +84,9 @@ void addScore(GameState& state, int rawPoints) {
  * Outputs: none
  *
  * Delegation chain:
- *   getPlayerName() [menu.h]   — handles all terminal input for the name
- *   addHighScore()  [fileio.h] — sorts top 10 and writes to disk
- *   getTopHighScore()[fileio.h] — reads current best to check for new record
+ *   addHighScore()   [fileio.h] — sorts top 10 and writes to disk
+ *   getTopHighScore()[fileio.h] — reads previous best to check for new record
+ *                                 (called BEFORE addHighScore to avoid race)
  */
 void saveFinalScore(GameState& state, bool defeatedDragon) {
     // Player name already captured at game start via main.cpp's getPlayerName().
@@ -103,19 +103,25 @@ void saveFinalScore(GameState& state, bool defeatedDragon) {
     hs.timestamp      = time(nullptr);      // Unix timestamp for display/sorting
     hs.defeatedDragon = defeatedDragon;     // false on death = partial score
 
+    // --- Snapshot top score BEFORE saving ---
+    // Must be called before addHighScore() so we compare against the previous
+    // best, not the score we are about to write. Calling it after would mean
+    // our new score is already in the file, making isNewBest almost always
+    // true for any top-10 entry — a false positive.
+    HighScore prevTop = getTopHighScore();
+
     // --- Delegate to fileio for top-10 sort + disk write ---
     // addHighScore() in fileio.cpp:
-    //   1. Loads current top-10 list from termicraft_highscores.dat
+    //   1. Loads current top-10 from termicraft_highscores.dat
     //   2. Appends hs, re-sorts descending by score
-    //   3. Trims to top 10
-    //   4. Writes back to file
-    //   5. Returns true if the new score made the cut
+    //   3. Trims to top 10, writes back to file
+    //   4. Returns true if the new score made the cut
     bool madeList = addHighScore(hs);
 
     // --- Confirmation message ---
-    // Check against the stored top score to display new record notice
-    HighScore top = getTopHighScore();
-    bool isNewBest = (state.score >= top.score);
+    // isNewBest uses prevTop (pre-save snapshot) — strictly greater than,
+    // not >= , so tied scores do not trigger the "new record" banner.
+    bool isNewBest = (state.score > prevTop.score);
 
     if (isNewBest) {
         cout << COLOR_SUCCESS
