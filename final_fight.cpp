@@ -44,6 +44,7 @@
 #include <unistd.h>       // usleep, read, STDIN_FILENO
 
 //using namespace std;
+
 // =============================================================================
 // Dragon ASCII art — 3 phase variants
 //
@@ -694,4 +695,216 @@ static void showScoreBreakdown(bool won,
 
 // score.cpp owns the high score saving functionality.
 
+// =============================================================================
+// runBossFight — main entry point
+// =============================================================================
+
+/*
+ * runBossFight — see final_fight.h for full documentation
+ */
+bool runBossFight(GameState& state) {
+
+    // -------------------------------------------------------------------------
+    // 1. Initialise fight state
+    // -------------------------------------------------------------------------
+    BossConfig  config     = initBossConfig(state.difficulty);
+    int         playerMaxHp = calcFightHP(state.difficulty,
+                                          state.player.equipment.armor);
+    int         playerHp    = playerMaxHp;
+    int         arrowDmg    = calcArmorDamage(state.player.equipment.armor);
+    const char* armorName   = getArmorName(state.player.equipment.armor);
+
+    // Capture mining score before any boss-fight points are added
+    int miningSnapshot = state.score;
+
+    // Per-phase hit counters for the score breakdown screen
+    int  p1Hits = 0, p2Hits = 0, p3Hits = 0;
+    bool killBonus = false;
+    bool won       = false;
+
+    Dragon dragon = initDragon(config);
+
+    // Initialise projectile pools (all inactive)
+    Fireball fireballs[FF_MAX_FIREBALLS];
+    for (int i = 0; i < FF_MAX_FIREBALLS; i++)
+        fireballs[i] = { 0, 0, false, 0 };
+
+    Arrow arrows[FF_MAX_ARROWS];
+    for (int i = 0; i < FF_MAX_ARROWS; i++)
+        arrows[i] = { 0, 0, false };
+
+    // Player starts centred horizontally
+    int playerX = FF_ARENA_WIDTH / 2;   // col 50
+
+    // Sprite is 13 chars; centre is at playerX, so half-width = 6
+    const int HALF    = 6;
+    const int PLR_MIN = 1 + HALF + 1;                    // col 8  (sprite left edge = col 2)
+    const int PLR_MAX = FF_ARENA_WIDTH - 2 - HALF - 1;   // col 91 (sprite right edge = col 97)
+
+    int fireballTick = 0;
+    bool running     = true;
+
+    // -------------------------------------------------------------------------
+    // 2. Intro screen (blocking input, before O_NONBLOCK is set)
+    // -------------------------------------------------------------------------
+    showIntroScreen(state, playerHp, playerMaxHp);
+
+    // -------------------------------------------------------------------------
+    // 3. Enable non-blocking input for the game loop
+    //    Saved flags are restored after the loop ends.
+    // -------------------------------------------------------------------------
+    int origFlags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, origFlags | O_NONBLOCK);
+
+    // -------------------------------------------------------------------------
+    // 4. Game loop  (one iteration = one tick = FF_TICK_US microseconds)
+    // -------------------------------------------------------------------------
+    while (running) {
+
+        // --- Input (non-blocking: returns immediately if no key pressed) ---
+        char ch;
+        if (read(STDIN_FILENO, &ch, 1) > 0) {
+            if      (ch == 'a' || ch == 'A') playerX = max(PLR_MIN, playerX - 3);
+            else if (ch == 'd' || ch == 'D') playerX = min(PLR_MAX, playerX + 3);
+            else if (ch == ' ')              fireArrow(arrows, playerX);
+            else if (ch == 'q' || ch == 'Q') {
+                // Quitting counts as death — partial score is still saved
+                running = false;
+                won     = false;
+            }
+        }
+
+        // --- Move dragon (whole block shifts left or right) ---
+        dragon.x += dragon.speed * dragon.direction;
+        if (dragon.x <= FF_DRAGON_MIN_X) {
+            dragon.x  = FF_DRAGON_MIN_X;
+            dragon.direction = 1;    // bounce: start moving right
+        } else if (dragon.x >= FF_DRAGON_MAX_X) {
+            dragon.x  = FF_DRAGON_MAX_X;
+            dragon.direction = -1;   // bounce: start moving left
+        }
+
+        // --- Spawn fireballs (on interval) ---
+        fireballTick++;
+        if (fireballTick >= config.fireRateTicks) {
+            fireballTick = 0;
+            spawnFireballs(fireballs, dragon);
+        }
+
+        // --- Move fireballs: 1 row down per tick, drift by dx ---
+        for (int i = 0; i < FF_MAX_FIREBALLS; i++) {
+            if (!fireballs[i].active) continue;
+            fireballs[i].y++;
+            fireballs[i].x += fireballs[i].dx;
+            // Deactivate if past player row or outside arena
+            if (fireballs[i].y  > FF_PLAYER_ROW      ||
+                fireballs[i].x  <= 0                  ||
+                fireballs[i].x  >= FF_ARENA_WIDTH - 1) {
+                fireballs[i].active = false;
+            }
+        }
+
+        // --- Move arrows: 1 row up per tick ---
+        for (int i = 0; i < FF_MAX_ARROWS; i++) {
+            if (!arrows[i].active) continue;
+            arrows[i].y--;
+            if (arrows[i].y < FF_DRAGON_TOP_ROW)
+                arrows[i].active = false;
+        }
+
+        // --- Collision: arrows vs dragon hitbox ---
+        // Hitbox: rows FF_DRAGON_TOP_ROW to FF_DRAGON_TOP_ROW+FF_DRAGON_ROWS-1,
+        //         cols dragon.x to dragon.x+FF_DRAGON_COLS-1
+        for (int i = 0; i < FF_MAX_ARROWS; i++) {
+            if (!arrows[i].active) continue;
+
+            bool hitRow = (arrows[i].y >= FF_DRAGON_TOP_ROW &&
+                           arrows[i].y <  FF_DRAGON_TOP_ROW + FF_DRAGON_ROWS);
+            bool hitCol = (arrows[i].x >= dragon.x &&
+                           arrows[i].x <  dragon.x + FF_DRAGON_COLS);
+
+            if (hitRow && hitCol) {
+                arrows[i].active = false;
+
+                // Damage dragon
+                dragon.hp -= arrowDmg;
+                if (dragon.hp < 0) dragon.hp = 0;
+
+                // Add score via centralised addScore() — multiplier applied inside
+                int rawPts = (dragon.phase == FF_PHASE1) ? FF_SCORE_HIT_P1 :
+                             (dragon.phase == FF_PHASE2) ? FF_SCORE_HIT_P2 :
+                                                           FF_SCORE_HIT_P3;
+                addScore(state, rawPts);
+
+                // Track per phase for the score breakdown screen
+                if      (dragon.phase == FF_PHASE1) p1Hits++;
+                else if (dragon.phase == FF_PHASE2) p2Hits++;
+                else                                p3Hits++;
+            }
+        }
+
+        // --- Collision: fireballs vs player ---
+        // Player hitbox: FF_PLAYER_ROW, cols playerX-HALF to playerX+HALF
+        int pLeft  = playerX - HALF;
+        int pRight = playerX + HALF;
+        for (int i = 0; i < FF_MAX_FIREBALLS; i++) {
+            if (!fireballs[i].active) continue;
+            if (fireballs[i].y == FF_PLAYER_ROW &&
+                fireballs[i].x >= pLeft          &&
+                fireballs[i].x <= pRight) {
+                fireballs[i].active = false;
+                playerHp -= config.fireballDmg;
+                if (playerHp < 0) playerHp = 0;
+            }
+        }
+
+        // --- Phase transitions ---
+        updatePhase(dragon, config.dragonSpeed);
+
+        // --- Win/lose conditions ---
+        if (dragon.hp <= 0) {
+            // Kill bonus — routed through addScore() like every other increment
+            addScore(state, FF_SCORE_KILL);
+            killBonus = true;
+            won       = true;
+            running   = false;
+        }
+        if (playerHp <= 0 && running) {
+            won     = false;
+            running = false;
+        }
+
+        // --- Render ---
+        renderArena(dragon, fireballs, arrows,
+                    playerX, playerHp, playerMaxHp,
+                    state.score, armorName);
+
+        // --- Tick delay ---
+        usleep(FF_TICK_US);
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Restore blocking input
+    // -------------------------------------------------------------------------
+    fcntl(STDIN_FILENO, F_SETFL, origFlags);
+
+    // -------------------------------------------------------------------------
+    // 6. Update shared game state
+    // -------------------------------------------------------------------------
+    state.dragonDefeated = won;
+    state.phase          = won ? PHASE_VICTORY : PHASE_GAMEOVER;
+
+    // -------------------------------------------------------------------------
+    // 7. Post-fight screens (score breakdown → name entry → save)
+    // -------------------------------------------------------------------------
+    showScoreBreakdown(won, miningSnapshot,
+                       p1Hits, p2Hits, p3Hits,
+                       killBonus, state.score,
+                       state.settings.scoreMultiplier);
+
+    // Name entry + leaderboard save — handled entirely by score.cpp
+    saveFinalScore(state, won);
+
+    return won;
+}
 
