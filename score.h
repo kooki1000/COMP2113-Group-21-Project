@@ -19,7 +19,7 @@
 //   No second name prompt is shown.
 //
 // Author:       Sohan
-// Dependencies: types.h, fileio.h, menu.h
+// Dependencies: types.h, fileio.h
 // =============================================================================
 
 #ifndef SCORE_H
