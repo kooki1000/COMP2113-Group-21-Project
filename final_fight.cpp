@@ -340,6 +340,7 @@ static void renderArena(const Dragon&   dragon,
     }
     cout.flush();
 }
+
 // =============================================================================
 // Public helper functions
 // =============================================================================
@@ -410,5 +411,287 @@ int calcArmorDamage(MaterialTier armor) {
         default:               return FF_DMG_DEFAULT;  // NONE, WOOD, STONE
     }
 }
+
+// =============================================================================
+// Private (static) helper functions
+// =============================================================================
+
+/*
+ * getArmorName
+ * Returns a short display string for a MaterialTier value.
+ * Used in the arena HUD and intro screen.
+ *
+ * Inputs:  armor - MaterialTier enum value
+ * Outputs: const char* — human-readable name
+ */
+static const char* getArmorName(MaterialTier armor) {
+    switch (armor) {
+        case MATERIAL_STONE:   return "Stone";
+        case MATERIAL_IRON:    return "Iron";
+        case MATERIAL_GOLD:    return "Gold";
+        case MATERIAL_DIAMOND: return "Diamond";
+        default:               return "None";
+    }
+}
+
+/*
+ * initDragon
+ * Creates a Dragon centred at the top of the arena, moving right, Phase 1.
+ *
+ * Inputs:  config - BossConfig for this difficulty
+ * Outputs: Dragon struct ready to enter the fight loop
+ */
+static Dragon initDragon(const BossConfig& config) {
+    Dragon d;
+    d.x         = (FF_ARENA_WIDTH - FF_DRAGON_COLS) / 2;   // ≈ col 32 (centred)
+    d.y         = FF_DRAGON_TOP_ROW;
+    d.hp        = config.dragonHp;
+    d.maxHp     = config.dragonHp;
+    d.speed     = config.dragonSpeed;
+    d.direction = 1;       // start moving right
+    d.phase     = FF_PHASE1;
+    return d;
+}
+
+/*
+ * updatePhase
+ * Checks dragon HP against phase thresholds and upgrades phase if needed.
+ * Speed increases by 1 col/tick at each phase transition above Phase 1.
+ * Phase can only advance (1 → 2 → 3), never retreat.
+ *
+ * Inputs:  dragon    - current dragon state (modified in place)
+ *          baseSpeed - config.dragonSpeed (reference for speed calculation)
+ * Outputs: none
+ */
+static void updatePhase(Dragon& dragon, int baseSpeed) {
+    if (dragon.hp <= 0) return;
+    int pct = dragon.hp * 100 / dragon.maxHp;
+
+    int newPhase;
+    if      (pct <= FF_PHASE3_PCT) newPhase = FF_PHASE3;
+    else if (pct <= FF_PHASE2_PCT) newPhase = FF_PHASE2;
+    else                           newPhase = FF_PHASE1;
+
+    if (newPhase > dragon.phase) {
+        dragon.phase = newPhase;
+        // Speed boost: +1 col/tick per phase above Phase 1
+        dragon.speed = baseSpeed + (dragon.phase - 1);
+    }
+}
+
+/*
+ * spawnFireballs
+ * Activates new fireballs from the first available slots in the pool.
+ * Spawn position: horizontally centred on the dragon, just below its body.
+ * Pattern per phase:
+ *   Phase 1 — 1 fireball at centre, dx=0 (straight down)
+ *   Phase 2 — 2 fireballs at centre ± FF_SPREAD_P2, dx = ∓1 (diverge as they fall)
+ *   Phase 3 — 3 fireballs: centre-spread, centre, centre+spread; dx=-1, 0, +1
+ *
+ * Inputs:  fireballs - the projectile pool array (modified in place)
+ *          dragon    - current dragon state (provides position and phase)
+ * Outputs: none
+ */
+static void spawnFireballs(Fireball* fireballs, const Dragon& dragon) {
+    // Horizontal centre of the dragon block
+    int cx     = dragon.x + FF_DRAGON_COLS / 2;
+    // Spawn just below the dragon body
+    int spawnY = FF_DRAGON_TOP_ROW + FF_DRAGON_ROWS;
+
+    // Build list of {x, dx} pairs for this volley
+    int spawnX[3], spawnDX[3], spawnCount;
+
+    if (dragon.phase == FF_PHASE1) {
+        spawnX[0] = cx;               spawnDX[0] = 0;
+        spawnCount = 1;
+    } else if (dragon.phase == FF_PHASE2) {
+        spawnX[0] = cx - FF_SPREAD_P2;  spawnDX[0] = -1;
+        spawnX[1] = cx + FF_SPREAD_P2;  spawnDX[1] =  1;
+        spawnCount = 2;
+    } else {   // FF_PHASE3
+        spawnX[0] = cx - FF_SPREAD_P3;  spawnDX[0] = -1;
+        spawnX[1] = cx;                  spawnDX[1] =  0;
+        spawnX[2] = cx + FF_SPREAD_P3;  spawnDX[2] =  1;
+        spawnCount = 3;
+    }
+
+    // Find free slots and activate them
+    int activated = 0;
+    for (int i = 0; i < FF_MAX_FIREBALLS && activated < spawnCount; i++) {
+        if (!fireballs[i].active) {
+            fireballs[i].x      = spawnX[activated];
+            fireballs[i].y      = spawnY;
+            fireballs[i].dx     = spawnDX[activated];
+            fireballs[i].active = true;
+            activated++;
+        }
+    }
+}
+
+/*
+ * fireArrow
+ * Activates a new arrow from the first available slot in the pool.
+ * Arrow spawns one row above the player sprite (FF_PLAYER_ROW - 1).
+ * If all FF_MAX_ARROWS slots are already active, the shot is silently dropped.
+ *
+ * Inputs:  arrows  - the arrow pool array (modified in place)
+ *          playerX - column to spawn the arrow at (the player's centre)
+ * Outputs: none
+ */
+static void fireArrow(Arrow* arrows, int playerX) {
+    for (int i = 0; i < FF_MAX_ARROWS; i++) {
+        if (!arrows[i].active) {
+            arrows[i].x      = playerX;
+            arrows[i].y      = FF_PLAYER_ROW - 1;
+            arrows[i].active = true;
+            return;    // one arrow per SPACE press
+        }
+    }
+    // All slots full — rapid fire cap reached, shot dropped silently
+}
+
+/*
+ * showIntroScreen
+ * Clears the screen and displays the cave entry lore + player stats.
+ * Warns the player if they entered without diamond armor.
+ * Calls waitForKeypress() before the fight begins.
+ *
+ * Inputs:  state       - game state (for armor and score)
+ *          playerHp    - computed starting fight HP
+ *          playerMaxHp - same as playerHp at call time (= full HP)
+ * Outputs: none
+ */
+static void showIntroScreen(const GameState& state, int playerHp, int playerMaxHp) {
+    clearScreen();
+    cout << COLOR_DRAGON
+         << "\n  ================================================================\n"
+         << "                    ~  THE DRAGON CAVE  ~                       \n"
+         << "  ================================================================\n"
+         << COLOR_RESET << "\n"
+         << "  The cavern floor trembles beneath your feet.\n"
+         << "  A low rumble reverberates through the stone walls.\n"
+         << "  Two burning eyes open in the darkness ahead...\n\n";
+
+    cout << COLOR_SCORE << "  Your stats:\n" << COLOR_RESET
+         << "    Armor:    " << COLOR_PLAYER
+                             << getArmorName(state.player.equipment.armor)
+                             << COLOR_RESET << "\n"
+         << "    Fight HP: " << COLOR_HEALTH
+                             << playerHp << " / " << playerMaxHp
+                             << COLOR_RESET << "\n"
+         << "    Score:    " << COLOR_SCORE
+                             << state.score
+                             << COLOR_RESET << "\n\n";
+
+    if (state.player.equipment.armor < MATERIAL_DIAMOND) {
+        cout << COLOR_WARNING
+             << "  WARNING: Diamond armor is recommended for this fight.\n"
+             << "           Entering with "
+             << getArmorName(state.player.equipment.armor)
+             << " armor — good luck.\n"
+             << COLOR_RESET << "\n";
+    } else {
+        cout << COLOR_SUCCESS
+             << "  You are fully equipped. The dragon awaits.\n"
+             << COLOR_RESET << "\n";
+    }
+
+    cout << "  Controls: [A] left   [D] right   [SPACE] shoot   [Q] quit\n\n"
+         << "  Press any key to begin...\n";
+
+    waitForKeypress();
+    clearScreen();
+}
+
+/*
+ * showScoreBreakdown
+ * Displays the end-of-fight score breakdown: mining score carried in,
+ * boss hits per phase with multiplier applied, kill bonus, and final total.
+ * Also signals a new high score if state.score beats the stored record.
+ *
+ * Inputs:  won           - true = dragon defeated, false = player died
+ *          miningSnapshot - state.score at the moment the fight started
+ *          p1/p2/p3Hits  - arrow hits landed in each phase
+ *          killBonus     - true if dragon was defeated (500 pt bonus applied)
+ *          totalScore    - state.score after the fight
+ *          scoreMult     - state.settings.scoreMultiplier
+ * Outputs: none
+ */
+static void showScoreBreakdown(bool won,
+                                int  miningSnapshot,
+                                int  p1Hits,
+                                int  p2Hits,
+                                int  p3Hits,
+                                bool killBonus,
+                                int  totalScore,
+                                float scoreMult) {
+    clearScreen();
+
+    if (won) {
+        cout << COLOR_SUCCESS
+             << "\n  *** THE DRAGON FALLS!  YOU ARE VICTORIOUS! ***\n\n"
+             << COLOR_RESET;
+    } else {
+        cout << COLOR_DANGER
+             << "\n  *** YOU HAVE FALLEN IN THE DRAGON'S LAIR... ***\n\n"
+             << COLOR_RESET;
+    }
+
+    cout << COLOR_SCORE
+         << "  ============= SCORE BREAKDOWN =============\n\n"
+         << COLOR_RESET;
+
+    cout << "  Mining score (carried in):    " << setw(8) << miningSnapshot << "\n\n"
+         << "  Boss fight:\n";
+
+    // Show each phase's contribution: raw pts, then multiplied
+    if (p1Hits > 0) {
+        int raw = p1Hits * FF_SCORE_HIT_P1;
+        cout << "    Phase 1 hits: " << setw(3) << p1Hits
+             << " x " << setw(2) << FF_SCORE_HIT_P1
+             << " pts = " << setw(5) << raw
+             << "  (x" << scoreMult << " = "
+             << (int)(raw * scoreMult) << ")\n";
+    }
+    if (p2Hits > 0) {
+        int raw = p2Hits * FF_SCORE_HIT_P2;
+        cout << "    Phase 2 hits: " << setw(3) << p2Hits
+             << " x " << setw(2) << FF_SCORE_HIT_P2
+             << " pts = " << setw(5) << raw
+             << "  (x" << scoreMult << " = "
+             << (int)(raw * scoreMult) << ")\n";
+    }
+    if (p3Hits > 0) {
+        int raw = p3Hits * FF_SCORE_HIT_P3;
+        cout << "    Phase 3 hits: " << setw(3) << p3Hits
+             << " x " << setw(2) << FF_SCORE_HIT_P3
+             << " pts = " << setw(5) << raw
+             << "  (x" << scoreMult << " = "
+             << (int)(raw * scoreMult) << ")\n";
+    }
+    if (killBonus) {
+        cout << "    Dragon kill bonus:             " << setw(5) << FF_SCORE_KILL
+             << "  (x" << scoreMult << " = "
+             << (int)(FF_SCORE_KILL * scoreMult) << ")\n";
+    }
+
+    int bossScore = totalScore - miningSnapshot;
+    cout << "\n    Boss fight total:         " << setw(8) << bossScore << "\n\n";
+
+    cout << COLOR_SCORE
+         << "  TOTAL SCORE:              " << setw(10) << totalScore << "\n"
+         << COLOR_RESET;
+
+    // New high score notice
+    HighScore existing = getTopHighScore();
+    if (totalScore > existing.score) {
+        cout << COLOR_SUCCESS << "\n  ** NEW HIGH SCORE! **\n" << COLOR_RESET;
+    }
+
+    cout << "\n";
+    waitForKeypress();
+}
+
+// score.cpp owns the high score saving functionality.
 
 
