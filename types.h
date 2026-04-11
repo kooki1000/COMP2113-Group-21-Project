@@ -22,6 +22,10 @@ const int WORLD_HEIGHT = 40;
 const int SURFACE_LEVEL = 8;      // ground starts here, sky above
 const int STONE_LEVEL = 12;       // stone layer begins
 const int DEEP_LEVEL = 25;        // rare ores spawn below this
+const int SURFACE_LEVEL = 8;      // ground starts here, sky above
+const int STONE_LEVEL = 12;       // stone layer begins
+const int DEEP_LEVEL = 25;        // rare ores spawn below this
+const int MINIGAME_COUNT = 2;     // Total number of available minigames
 
 // Block types - used in the world grid
 enum BlockType {
@@ -156,10 +160,12 @@ struct DifficultySettings {
     float scoreMultiplier;
     int wordleWordLength;    // for Aryan's minigame
     int minesweeperSize;     // grid size for Nan's minigame
-    
+    int minigameDamage; 
+
     DifficultySettings() : name("Normal"), playerHealth(100), 
         enemyHealthMult(100), oreSpawnRate(100), enemySpawnChance(15),
-        scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8) {}
+        scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8),
+        minigameDamage(20) {}
 };
 
 // High score entry
@@ -218,7 +224,15 @@ struct GameState {
     bool victory;
     std::string lastMessage;     // status text at bottom of screen
     unsigned int seed;           // world gen seed for reproducibility
-    
+
+    // Mining attempt state (new for minigame-gated mining)
+    Position pendingMinePos;    // Target block coordinates
+    BlockType pendingMineType;  // What we're trying to mine
+    bool miningPending;         // True if waiting for minigame result
+
+    // Minigame damage settings (based on difficulty)
+    int minigameDamage;  // HP lost on failure (set by difficulty)
+
     GameState() : phase(PHASE_MENU), difficulty(DIFF_NORMAL), 
         world(nullptr), worldWidth(WORLD_WIDTH), worldHeight(WORLD_HEIGHT),
         dragonCaveFound(false), dragonDefeated(false),
@@ -226,7 +240,8 @@ struct GameState {
         currentMinigame(MINIGAME_NONE), minigameActive(false),
         pendingUpgrade(MATERIAL_NONE),
         viewportWidth(60), viewportHeight(20),
-        gameOver(false), victory(false), seed(0) {}
+        gameOver(false), victory(false), seed(0),
+        miningPending(false), minigameDamage(20) {}
     
     // IMPORTANT: Don't copy GameState by value!
     // The world pointer will get double-freed and crash everything.
@@ -291,31 +306,34 @@ inline DifficultySettings getDifficultySettings(Difficulty diff) {
             s.name = "Easy";
             s.playerHealth = 150;
             s.enemyHealthMult = 75;
-            s.oreSpawnRate = 130;
+            s.enemySpawnChance = 0;  // No longer used, but keep for compatibility
             s.enemySpawnChance = 10;
             s.scoreMultiplier = 1.0f;
             s.wordleWordLength = 4;
             s.minesweeperSize = 6;
+            s.minigameDamage = 10;
             break;
         case DIFF_NORMAL:
             s.name = "Normal";
             s.playerHealth = 100;
             s.enemyHealthMult = 100;
             s.oreSpawnRate = 100;
-            s.enemySpawnChance = 15;
+            s.enemySpawnChance = 0;
             s.scoreMultiplier = 1.5f;
             s.wordleWordLength = 5;
             s.minesweeperSize = 8;
+            s.minigameDamage = 20;
             break;
         case DIFF_HARD:
             s.name = "Hard";
             s.playerHealth = 75;
-            s.enemyHealthMult = 150;
+            s.enemyHealthMult = 0;
             s.oreSpawnRate = 70;
             s.enemySpawnChance = 25;
             s.scoreMultiplier = 2.0f;
             s.wordleWordLength = 6;
             s.minesweeperSize = 10;
+            s.minigameDamage = 30;
             break;
     }
     return s;
