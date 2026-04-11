@@ -340,5 +340,75 @@ static void renderArena(const Dragon&   dragon,
     }
     cout.flush();
 }
+// =============================================================================
+// Public helper functions
+// =============================================================================
+
+/*
+ * initBossConfig — see final_fight.h for full documentation
+ */
+BossConfig initBossConfig(Difficulty diff) {
+    BossConfig cfg;
+    switch (diff) {
+        case DIFF_EASY:
+            cfg.dragonHp      = 50;
+            cfg.fireballDmg   = 2;
+            cfg.fireRateTicks = 40;    // ~2.0 s at 50 ms/tick
+            cfg.dragonSpeed   = 1;
+            break;
+        case DIFF_NORMAL:
+            cfg.dragonHp      = 80;
+            cfg.fireballDmg   = 5;
+            cfg.fireRateTicks = 24;    // ~1.2 s
+            cfg.dragonSpeed   = 2;
+            break;
+        case DIFF_HARD:
+        default:
+            cfg.dragonHp      = 120;
+            cfg.fireballDmg   = 10;
+            cfg.fireRateTicks = 14;    // ~0.7 s
+            cfg.dragonSpeed   = 3;
+            break;
+    }
+    return cfg;
+}
+
+/*
+ * calcFightHP — see final_fight.h for full documentation
+ */
+int calcFightHP(Difficulty diff, MaterialTier armor) {
+    // Base HP by difficulty
+    int base;
+    switch (diff) {
+        case DIFF_EASY:   base = FF_BASE_HP_EASY;   break;
+        case DIFF_HARD:   base = FF_BASE_HP_HARD;   break;
+        case DIFF_NORMAL:
+        default:          base = FF_BASE_HP_NORMAL;  break;
+    }
+
+    // Flat armor bonus — identical on every difficulty
+    int bonus;
+    switch (armor) {
+        case MATERIAL_STONE:   bonus = FF_HP_BONUS_STONE;   break;
+        case MATERIAL_IRON:    bonus = FF_HP_BONUS_IRON;    break;
+        case MATERIAL_GOLD:    bonus = FF_HP_BONUS_GOLD;    break;
+        case MATERIAL_DIAMOND: bonus = FF_HP_BONUS_DIAMOND; break;
+        default:               bonus = 0;                   break;
+    }
+
+    return base + bonus;
+}
+
+/*
+ * calcArmorDamage — see final_fight.h for full documentation
+ */
+int calcArmorDamage(MaterialTier armor) {
+    switch (armor) {
+        case MATERIAL_IRON:    return FF_DMG_IRON;
+        case MATERIAL_GOLD:    return FF_DMG_GOLD;
+        case MATERIAL_DIAMOND: return FF_DMG_DIAMOND;
+        default:               return FF_DMG_DEFAULT;  // NONE, WOOD, STONE
+    }
+}
 
 
