@@ -1,6 +1,6 @@
 #include <iostream>
 #include <cctype>
-using namespace std;
+#include <vector>
 
 const int easygrid = 5;
 const int mediumgrid = 10;
@@ -19,9 +19,9 @@ private:
     void initializeGrids(int size);
     int size;
     int mines;
-    vector<vector<bool>> mineGrid;
-    vector<vector<int>> solutionGrid;
-    vector<vector<char>> revealedGrid;
+    std::vector<std::vector<bool>> mineGrid;           
+    std::vector<std::vector<int>> solutionGrid;      
+    std::vector<std::vector<char>> revealedGrid; 
     bool gameOver;
     bool win;
 };
@@ -43,7 +43,7 @@ bool isValidMove(int x, int y, int gridSize) {
     return true;
 }
 
-int countAdjacentMines(int x, int y, const vector<vector<int>>& board) {
+int countAdjacentMines(int x, int y, const std::vector<std::vector<int>>& board) { 
     int count = 0;
     for (int i = -1; i <= 1; ++i) {
         for (int j = -1; j <= 1; ++j) {
@@ -55,7 +55,7 @@ int countAdjacentMines(int x, int y, const vector<vector<int>>& board) {
     return count;
 }
 
-void displayBoard(const vector<vector<int>>& grid, const vector<vector<bool>>& revealed) {
+void displayBoard(const std::vector<std::vector<int>>& grid, const std::vector<std::vector<bool>>& revealed) {
     cout << "   ";
     for (int i = 0; i < grid.size(); ++i) {
         cout << i << " ";
@@ -80,9 +80,9 @@ void displayBoard(const vector<vector<int>>& grid, const vector<vector<bool>>& r
 }
 
 void initializeGrids(int size){
-    mineGrid.assign(size, vector<bool>(size, false));
-    solutionGrid.assign(size, vector<int>(size, 0));
-    revealedGrid.assign(size, vector<char>(size, '#'));
+    mineGrid.assign(size, std::vector<bool>(size, false));  
+    solutionGrid.assign(size, std::vector<int>(size, 0)); 
+    revealedGrid.assign(size, std::vector<char>(size, '#')); 
 }
 
 void placeMines(){
