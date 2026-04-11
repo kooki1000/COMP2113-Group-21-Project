@@ -127,8 +127,10 @@ struct Player {
     Inventory inventory;
     Equipment equipment;
     bool alive;
-    
-    Player() : name("Player"), health(100), maxHealth(100), alive(true) {}
+    int facingX;  // -1, 0, or 1
+    int facingY;  // -1, 0, or 1 (default 1 for facing down) 
+
+    Player() : name("Player"), health(100), maxHealth(100), alive(true), facingX(0), facingY(1) {}
 };
 
 // Enemies - bugs underground, zombies on surface
