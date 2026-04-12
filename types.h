@@ -10,9 +10,11 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <string>
+#include <colors.h>
+
 #include <vector>
 #include <ctime>
+#include <string>
 
 // ----- CONSTANTS -----
 
@@ -22,6 +24,10 @@ const int WORLD_HEIGHT = 40;
 const int SURFACE_LEVEL = 8;      // ground starts here, sky above
 const int STONE_LEVEL = 12;       // stone layer begins
 const int DEEP_LEVEL = 25;        // rare ores spawn below this
+const int SURFACE_LEVEL = 8;      // ground starts here, sky above
+const int STONE_LEVEL = 12;       // stone layer begins
+const int DEEP_LEVEL = 25;        // rare ores spawn below this
+const int MINIGAME_COUNT = 2;     // Total number of available minigames
 
 // Block types - used in the world grid
 enum BlockType {
@@ -39,6 +45,10 @@ enum BlockType {
     BLOCK_BEDROCK = 11,
     BLOCK_DRAGON_CAVE = 12
 };
+
+// Recipe table defined in crafting.cpp
+extern const CraftingRecipe RECIPES[];
+extern const int NUM_RECIPES;
 
 // Tool and armor tiers - higher = better
 enum MaterialTier {
@@ -127,8 +137,10 @@ struct Player {
     Inventory inventory;
     Equipment equipment;
     bool alive;
-    
-    Player() : name("Player"), health(100), maxHealth(100), alive(true) {}
+    int facingX;  // -1, 0, or 1
+    int facingY;  // -1, 0, or 1 (default 1 for facing down) 
+
+    Player() : name("Player"), health(100), maxHealth(100), alive(true), facingX(0), facingY(1) {}
 };
 
 // Enemies - bugs underground, zombies on surface
@@ -144,6 +156,20 @@ struct Enemy {
     Enemy() : name("Bug"), health(20), maxHealth(20), damage(5), alive(true), symbol('B') {}
 };
 
+struct CraftingRecipe {
+    MaterialTier tier;  // Target material tier
+    bool isArmor;       // true = armor, false = pickaxe
+    int woodCost;
+    int stoneCost;
+    int ironCost;
+    int goldCost;
+    int diamondCost;
+    MaterialTier requiredPickaxe;  // Minimum pickaxe tier required
+    MaterialTier requiredArmor;    // Minimum armor tier required (for armor crafting)
+    const char* displayName;       // Human-readable name
+    const char* description;       // Flavor text and stats
+};
+
 // Settings that change based on difficulty
 struct DifficultySettings {
     std::string name;
@@ -154,10 +180,12 @@ struct DifficultySettings {
     float scoreMultiplier;
     int wordleWordLength;    // for Aryan's minigame
     int minesweeperSize;     // grid size for Nan's minigame
-    
+    int minigameDamage; 
+
     DifficultySettings() : name("Normal"), playerHealth(100), 
         enemyHealthMult(100), oreSpawnRate(100), enemySpawnChance(15),
-        scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8) {}
+        scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8),
+        minigameDamage(20) {}
 };
 
 // High score entry
@@ -216,7 +244,15 @@ struct GameState {
     bool victory;
     std::string lastMessage;     // status text at bottom of screen
     unsigned int seed;           // world gen seed for reproducibility
-    
+
+    // Mining attempt state (new for minigame-gated mining)
+    Position pendingMinePos;    // Target block coordinates
+    BlockType pendingMineType;  // What we're trying to mine
+    bool miningPending;         // True if waiting for minigame result
+
+    // Minigame damage settings (based on difficulty)
+    int minigameDamage;  // HP lost on failure (set by difficulty)
+
     GameState() : phase(PHASE_MENU), difficulty(DIFF_NORMAL), 
         world(nullptr), worldWidth(WORLD_WIDTH), worldHeight(WORLD_HEIGHT),
         dragonCaveFound(false), dragonDefeated(false),
@@ -224,7 +260,8 @@ struct GameState {
         currentMinigame(MINIGAME_NONE), minigameActive(false),
         pendingUpgrade(MATERIAL_NONE),
         viewportWidth(60), viewportHeight(20),
-        gameOver(false), victory(false), seed(0) {}
+        gameOver(false), victory(false), seed(0),
+        miningPending(false), minigameDamage(20) {}
     
     // IMPORTANT: Don't copy GameState by value!
     // The world pointer will get double-freed and crash everything.
@@ -268,6 +305,24 @@ inline std::string getMaterialName(MaterialTier tier) {
     }
 }
 
+// Get color based on craftability status
+inline const char* getTierColor(MaterialTier tier) {
+    switch (tier) {
+        case MATERIAL_WOOD:
+            return COLOR_WOOD;
+        case MATERIAL_STONE:
+            return COLOR_STONE;
+        case MATERIAL_IRON:
+            return COLOR_IRON;
+        case MATERIAL_GOLD:
+            return COLOR_GOLD_ORE;
+        case MATERIAL_DIAMOND:
+            return COLOR_DIAMOND;
+        default:
+            return COLOR_WHITE;
+    }
+}
+
 // Points you get for mining each block type
 inline int getBlockScore(BlockType type) {
     switch (type) {
@@ -289,31 +344,34 @@ inline DifficultySettings getDifficultySettings(Difficulty diff) {
             s.name = "Easy";
             s.playerHealth = 150;
             s.enemyHealthMult = 75;
-            s.oreSpawnRate = 130;
+            s.enemySpawnChance = 0;  // No longer used, but keep for compatibility
             s.enemySpawnChance = 10;
             s.scoreMultiplier = 1.0f;
             s.wordleWordLength = 4;
             s.minesweeperSize = 6;
+            s.minigameDamage = 10;
             break;
         case DIFF_NORMAL:
             s.name = "Normal";
             s.playerHealth = 100;
             s.enemyHealthMult = 100;
             s.oreSpawnRate = 100;
-            s.enemySpawnChance = 15;
+            s.enemySpawnChance = 0;
             s.scoreMultiplier = 1.5f;
             s.wordleWordLength = 5;
             s.minesweeperSize = 8;
+            s.minigameDamage = 20;
             break;
         case DIFF_HARD:
             s.name = "Hard";
             s.playerHealth = 75;
-            s.enemyHealthMult = 150;
+            s.enemyHealthMult = 0;
             s.oreSpawnRate = 70;
             s.enemySpawnChance = 25;
             s.scoreMultiplier = 2.0f;
             s.wordleWordLength = 6;
             s.minesweeperSize = 10;
+            s.minigameDamage = 30;
             break;
     }
     return s;
