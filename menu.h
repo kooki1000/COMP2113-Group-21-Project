@@ -39,6 +39,9 @@ void waitForKeypress();
 // Ask player to type their name
 std::string getPlayerName(const std::string& prompt);
 
+// Read a single keypress without waiting for Enter
+char getch();
+
 // ----- ASCII ART -----
 
 // Big fancy title banner
