@@ -28,8 +28,9 @@
 #include <iostream>
 
 #include "colors.h"
-#include "menu.h"
 #include "crafting.h"
+#include "menu.h"
+#include "score.h"    // addScore() — centralised score increment with multiplier
 
 // Initialize player at the dragon carcass spawn point
 void initPlayer(GameState& state, const std::string& playerName) {
@@ -279,9 +280,11 @@ void resolveMiningAttempt(GameState& state, bool minigameWon) {
         state.world[ty][tx].mined = true;
         state.world[ty][tx].type = BLOCK_AIR;
 
-        // Update score and stats
+        // Update score and stats.
+        // addScore() (score.h) is the single place that applies scoreMultiplier —
+        // do NOT increment state.score directly anywhere else in this file.
         if (points > 0) {
-            state.score += static_cast<int>(points * state.settings.scoreMultiplier);
+            addScore(state, points);
             state.oresMined++;
         }
 
