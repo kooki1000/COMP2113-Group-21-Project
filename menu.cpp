@@ -565,17 +565,6 @@ void renderHUD(const GameState &state) {
   std::cout << "\n";
 }
 
-// inventory TODO KOKI
-/*
-void showInventory(const GameState& state) {
-    clearScreen();
-*/
-
-// crafting interface TODO KOKI
-/*
-
-*/
-
 void showStatusMessage(const std::string &message, bool isError) {
   if (isError) {
     std::cout << COLOR_RED;
