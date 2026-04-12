@@ -10,9 +10,11 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <string>
+#include <colors.h>
+
 #include <vector>
 #include <ctime>
+#include <string>
 
 // ----- CONSTANTS -----
 
@@ -43,6 +45,10 @@ enum BlockType {
     BLOCK_BEDROCK = 11,
     BLOCK_DRAGON_CAVE = 12
 };
+
+// Recipe table defined in crafting.cpp
+extern const CraftingRecipe RECIPES[];
+extern const int NUM_RECIPES;
 
 // Tool and armor tiers - higher = better
 enum MaterialTier {
@@ -148,6 +154,20 @@ struct Enemy {
     char symbol;
     
     Enemy() : name("Bug"), health(20), maxHealth(20), damage(5), alive(true), symbol('B') {}
+};
+
+struct CraftingRecipe {
+    MaterialTier tier;  // Target material tier
+    bool isArmor;       // true = armor, false = pickaxe
+    int woodCost;
+    int stoneCost;
+    int ironCost;
+    int goldCost;
+    int diamondCost;
+    MaterialTier requiredPickaxe;  // Minimum pickaxe tier required
+    MaterialTier requiredArmor;    // Minimum armor tier required (for armor crafting)
+    const char* displayName;       // Human-readable name
+    const char* description;       // Flavor text and stats
 };
 
 // Settings that change based on difficulty
@@ -282,6 +302,24 @@ inline std::string getMaterialName(MaterialTier tier) {
         case MATERIAL_GOLD:    return "Gold";
         case MATERIAL_DIAMOND: return "Diamond";
         default:               return "Unknown";
+    }
+}
+
+// Get color based on craftability status
+inline const char* getTierColor(MaterialTier tier) {
+    switch (tier) {
+        case MATERIAL_WOOD:
+            return COLOR_WOOD;
+        case MATERIAL_STONE:
+            return COLOR_STONE;
+        case MATERIAL_IRON:
+            return COLOR_IRON;
+        case MATERIAL_GOLD:
+            return COLOR_GOLD_ORE;
+        case MATERIAL_DIAMOND:
+            return COLOR_DIAMOND;
+        default:
+            return COLOR_WHITE;
     }
 }
 
