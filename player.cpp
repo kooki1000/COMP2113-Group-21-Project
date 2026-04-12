@@ -29,6 +29,7 @@
 
 #include "colors.h"
 #include "menu.h"
+#include "crafting.h"
 
 // Initialize player at the dragon carcass spawn point
 void initPlayer(GameState& state, const std::string& playerName) {
@@ -350,7 +351,7 @@ void handleInput(GameState& state, char input) {
 
         case 'c':
         case 'C': {  // Crafting
-            // openCraftingMenu(state); // TODO: Implement openCraftingMenu() function
+            openCraftingMenu(state);
             break;
         }
 
