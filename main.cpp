@@ -254,15 +254,7 @@ int main() {
 
         showGameOver(gameState, gameState.victory);
 
-        if (isHighScore(gameState.score)) {
-          HighScore hs;
-          hs.playerName = gameState.player.name;
-          hs.score = gameState.score;
-          hs.difficulty = gameState.difficulty;
-          hs.timestamp = time(nullptr);
-          hs.defeatedDragon = gameState.dragonDefeated;
-          addHighScore(hs);
-        }
+        //show high score (sohan score.cpp)
       }
 
       cleanupGame(gameState);
@@ -285,15 +277,7 @@ int main() {
             // gameState.settings.scoreMultiplier);
             showGameOver(gameState, gameState.victory);
 
-            if (isHighScore(gameState.score)) {
-              HighScore hs;
-              hs.playerName = gameState.player.name;
-              hs.score = gameState.score;
-              hs.difficulty = gameState.difficulty;
-              hs.timestamp = time(nullptr);
-              hs.defeatedDragon = gameState.dragonDefeated;
-              addHighScore(hs);
-            }
+           //show score by sohans file
           }
 
           cleanupGame(gameState);
