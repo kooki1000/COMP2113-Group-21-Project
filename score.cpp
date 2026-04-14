@@ -31,7 +31,7 @@
 #include <iostream>
 #include <ctime>       // time() for HighScore.timestamp
 
-using namespace std;
+//using namespace std;
 
 // =============================================================================
 // addScore
