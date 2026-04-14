@@ -19,10 +19,13 @@
 // ----- CONSTANTS -----
 
 // World size stuff
-const int WORLD_WIDTH = 80;
-const int WORLD_HEIGHT = 40;
+const int WORLD_WIDTH = 200;
+const int WORLD_HEIGHT = 80;
 const int SURFACE_LEVEL = 8;      // ground starts here, sky above
 const int STONE_LEVEL = 12;       // stone layer begins
+const int GOLD_LEVEL = 30;        // gold layer begins
+const int DIAMOND_LEVEL = 50;     // diamond layer begins
+const int DEEP_LEVEL = 50;        // rare ores spawn below this
 const int DEEP_LEVEL = 25;        // rare ores spawn below this
 const int SURFACE_LEVEL = 8;      // ground starts here, sky above
 const int STONE_LEVEL = 12;       // stone layer begins
@@ -259,6 +262,8 @@ struct GameState {
         score(0), oresMined(0), enemiesKilled(0),
         currentMinigame(MINIGAME_NONE), minigameActive(false),
         pendingUpgrade(MATERIAL_NONE),
+        viewportWidth(80), viewportHeight(25),
+        gameOver(false), victory(false), seed(0) {}
         viewportWidth(60), viewportHeight(20),
         gameOver(false), victory(false), seed(0),
         miningPending(false), minigameDamage(20) {}
