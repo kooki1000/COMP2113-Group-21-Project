@@ -2,7 +2,7 @@
  * fileio.cpp
  * 
  * Save/load implementation. Writes everything to text files.
- * Format just dumps values line by line.
+ * Formatss line by line.
  */
 
 #include "fileio.h"
@@ -11,13 +11,12 @@
 #include <algorithm>
 #include <ctime>
 #include <iostream>
-
-using namespace std;
+#include <cstdio>
 
 // ----- SAVE/LOAD GAME -----
 
-bool saveGame(const GameState& state, const string& filename) {
-    ofstream file(filename);
+bool saveGame(const GameState& state, const std::string& filename) {
+    std::ofstream file(filename);
     if (!file.is_open()) {
         return false;
     }
@@ -81,15 +80,15 @@ bool saveGame(const GameState& state, const string& filename) {
     return true;
 }
 
-bool loadGame(GameState& state, const string& filename) {
-    ifstream file(filename);
+bool loadGame(GameState& state, const std::string& filename) {
+    std::ifstream file(filename);
     if (!file.is_open()) {
         return false;
     }
     
     // Check header
-    string header;
-    getline(file, header);
+    std::string header;
+    std::getline(file, header);
     if (header != "TERMICRAFT_SAVE_V1") {
         file.close();
         return false;
@@ -109,7 +108,7 @@ bool loadGame(GameState& state, const string& filename) {
     file.ignore(); // skip the newline after these numbers
     
     // Player
-    getline(file, state.player.name);
+    std::getline(file, state.player.name);
     file >> state.player.pos.x >> state.player.pos.y;
     file >> state.player.health >> state.player.maxHealth;
     file >> state.player.alive;
@@ -166,14 +165,14 @@ bool loadGame(GameState& state, const string& filename) {
     }
     
     // Enemies
-    size_t enemyCount;
+    std::size_t enemyCount;
     file >> enemyCount;
     file.ignore();
     
     state.enemies.clear();
-    for (size_t i = 0; i < enemyCount; i++) {
+    for (std::size_t i = 0; i < enemyCount; i++) {
         Enemy enemy;
-        getline(file, enemy.name);
+        std::getline(file, enemy.name);
         file >> enemy.pos.x >> enemy.pos.y;
         file >> enemy.health >> enemy.maxHealth;
         file >> enemy.damage >> enemy.alive >> enemy.symbol;
@@ -185,39 +184,39 @@ bool loadGame(GameState& state, const string& filename) {
     return true;
 }
 
-bool saveFileExists(const string& filename) {
-    ifstream file(filename);
+bool saveFileExists(const std::string& filename) {
+    std::ifstream file(filename);
     return file.good();
 }
 
-bool deleteSaveFile(const string& filename) {
-    return remove(filename.c_str()) == 0;
+bool deleteSaveFile(const std::string& filename) {
+    return std::remove(filename.c_str()) == 0;
 }
 
 // ----- HIGH SCORES -----
 
-vector<HighScore> loadHighScores() {
-    vector<HighScore> scores;
+std::vector<HighScore> loadHighScores() {
+    std::vector<HighScore> scores;
     
-    ifstream file(HIGHSCORE_FILE);
+    std::ifstream file(HIGHSCORE_FILE);
     if (!file.is_open()) {
         return scores;
     }
     
-    string header;
-    getline(file, header);
+    std::string header;
+    std::getline(file, header);
     if (header != "TERMICRAFT_HIGHSCORES_V1") {
         file.close();
         return scores;
     }
     
-    size_t count;
+    std::size_t count;
     file >> count;
     file.ignore();
     
-    for (size_t i = 0; i < count && i < 10; i++) {
+    for (std::size_t i = 0; i < count && i < 10; i++) {
         HighScore hs;
-        getline(file, hs.playerName);
+        std::getline(file, hs.playerName);
         
         int difficulty;
         file >> hs.score >> difficulty >> hs.timestamp >> hs.defeatedDragon;
@@ -230,25 +229,25 @@ vector<HighScore> loadHighScores() {
     file.close();
     
     // Sort highest first
-    sort(scores.begin(), scores.end(), [](const HighScore& a, const HighScore& b) {
+    std::sort(scores.begin(), scores.end(), [](const HighScore& a, const HighScore& b) {
         return a.score > b.score;
     });
     
     return scores;
 }
 
-bool saveHighScores(const vector<HighScore>& scores) {
-    ofstream file(HIGHSCORE_FILE);
+bool saveHighScores(const std::vector<HighScore>& scores) {
+    std::ofstream file(HIGHSCORE_FILE);
     if (!file.is_open()) {
         return false;
     }
     
     file << "TERMICRAFT_HIGHSCORES_V1\n";
     
-    size_t count = min(scores.size(), (size_t)10);
+    std::size_t count = std::min(scores.size(), (std::size_t)10);
     file << count << "\n";
     
-    for (size_t i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
         const HighScore& hs = scores[i];
         file << hs.playerName << "\n";
         file << hs.score << " ";
@@ -262,12 +261,12 @@ bool saveHighScores(const vector<HighScore>& scores) {
 }
 
 bool addHighScore(const HighScore& newScore) {
-    vector<HighScore> scores = loadHighScores();
+    std::vector<HighScore> scores = loadHighScores();
     
     scores.push_back(newScore);
     
     // Sort and keep top 10
-    sort(scores.begin(), scores.end(), [](const HighScore& a, const HighScore& b) {
+    std::sort(scores.begin(), scores.end(), [](const HighScore& a, const HighScore& b) {
         return a.score > b.score;
     });
     
@@ -289,7 +288,7 @@ bool addHighScore(const HighScore& newScore) {
 }
 
 HighScore getTopHighScore() {
-    vector<HighScore> scores = loadHighScores();
+    std::vector<HighScore> scores = loadHighScores();
     if (scores.empty()) {
         return HighScore();
     }
@@ -297,7 +296,7 @@ HighScore getTopHighScore() {
 }
 
 bool isHighScore(int score) {
-    vector<HighScore> scores = loadHighScores();
+    std::vector<HighScore> scores = loadHighScores();
     
     if (scores.size() < 10) {
         return score > 0;
@@ -308,8 +307,8 @@ bool isHighScore(int score) {
 
 // ----- WORLD SERIALIZATION -----
 
-string serializeWorld(const GameState& state) {
-    stringstream ss;
+std::string serializeWorld(const GameState& state) {
+    std::stringstream ss;
     
     ss << state.worldWidth << "," << state.worldHeight << ";";
     
@@ -324,21 +323,21 @@ string serializeWorld(const GameState& state) {
     return ss.str();
 }
 
-bool deserializeWorld(GameState& state, const string& data) {
+bool deserializeWorld(GameState& state, const std::string& data) {
     try {
         // Parse dimensions from start of string
-        size_t dimEnd = data.find(';');
-        if (dimEnd == string::npos) return false;
+        std::size_t dimEnd = data.find(';');
+        if (dimEnd == std::string::npos) return false;
         
-        string dimStr = data.substr(0, dimEnd);
-        size_t comma = dimStr.find(',');
-        if (comma == string::npos) return false;
+        std::string dimStr = data.substr(0, dimEnd);
+        std::size_t comma = dimStr.find(',');
+        if (comma == std::string::npos) return false;
         
         // Save old height before we overwrite it
         int oldHeight = state.worldHeight;
         
-        state.worldWidth = stoi(dimStr.substr(0, comma));
-        state.worldHeight = stoi(dimStr.substr(comma + 1));
+        state.worldWidth = std::stoi(dimStr.substr(0, comma));
+        state.worldHeight = std::stoi(dimStr.substr(comma + 1));
         
         // Free old world with OLD dimensions
         if (state.world != nullptr) {
@@ -355,19 +354,19 @@ bool deserializeWorld(GameState& state, const string& data) {
         }
         
         // Parse the actual world data
-        string worldData = data.substr(dimEnd + 1);
-        stringstream ss(worldData);
+        std::string worldData = data.substr(dimEnd + 1);
+        std::stringstream ss(worldData);
         
         for (int y = 0; y < state.worldHeight; y++) {
-            string row;
-            getline(ss, row, ';');
+            std::string row;
+            std::getline(ss, row, ';');
             
-            stringstream rowss(row);
+            std::stringstream rowss(row);
             for (int x = 0; x < state.worldWidth; x++) {
-                string cell;
-                getline(rowss, cell, ',');
+                std::string cell;
+                std::getline(rowss, cell, ',');
                 
-                int type = stoi(cell);
+                int type = std::stoi(cell);
                 state.world[y][x].type = static_cast<BlockType>(type);
                 state.world[y][x].mined = (type == BLOCK_AIR);
             }
@@ -375,7 +374,7 @@ bool deserializeWorld(GameState& state, const string& data) {
         
         return true;
         
-    } catch (const exception& e) {
+    } catch (const std::exception& e) {
         // If anything goes wrong parsing, just fail gracefully
         return false;
     }
