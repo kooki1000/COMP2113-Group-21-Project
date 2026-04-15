@@ -96,3 +96,101 @@ void placeMines(){
         }
     }
 }
+
+void fillSolutionGriod(){
+    for(int x=0; x<size; x++){
+        for(int y=0; y<size; y++){
+            if(mineGrid[x][y]){
+                solutionGrid[x][y] = -1;
+            } else {
+                solutionGrid[x][y] = countAdjacentMines(x, y, solutionGrid);
+            }
+        }
+    }
+}
+
+void revealSingleCell(int x, int y){
+    if (!isValidMove(x, y, size)) {
+        return;
+    }
+    if(mineGrid[x][y]){
+        gameOver = true;
+        return;
+    }
+    revealedGrid[x][y] = solutionGrid[x][y];
+    return;
+}
+
+void floodReveal(int x, int y){
+    if (!isValidMove(x, y, size) || revealedGrid[x][y] != '#') {
+        return;
+    }
+    revealedGrid[x][y] = solutionGrid[x][y];
+    if (solutionGrid[x][y] == 0) {
+        for (int i = -1; i <= 1; ++i) {
+            for (int j = -1; j <= 1; ++j) {
+                floodReveal(x + i, y + j);
+            }
+        }
+    }
+}
+
+void flagCell(int x, int y) {
+    if (!isValidMove(x, y, size)) {
+        return;
+    }
+    if(revealedGrid[x][y] == 'F'){
+        revealedGrid[x][y] = '#';
+    }
+    else if(revealedGrid[x][y] == '#'){
+        revealedGrid[x][y] = 'F';
+    }
+
+}
+
+bool checkWin(){
+    for(int x=0; x<size; x++){
+        for(int y=0; y<size; y++){
+            if(mineGrid[x][y] && revealedGrid[x][y] != 'F'){
+                return false;
+            }
+            if(!mineGrid[x][y] && revealedGrid[x][y] == 'F'){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void revealMines(){
+    for(int x=0; x<size; x++){
+        for(int y=0; y<size; y++){
+            if(mineGrid[x][y]){
+                revealedGrid[x][y] = 'M';
+            }
+        }
+    }
+}
+
+void gameOverMessage(){
+    if (win == true) {
+        std::cout << cout << R"(
+   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗██╗
+   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║██║
+    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║██║
+     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║██║
+      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██║
+      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝
+        )"<< std::endl;
+    } else {
+        std::cout << R"(
+   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗ 
+  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗
+  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝
+  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
+  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║
+   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝
+        )"<< std::endl;
+    }
+}
+
