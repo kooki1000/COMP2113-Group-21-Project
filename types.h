@@ -264,10 +264,7 @@ struct GameState {
         pendingUpgrade(MATERIAL_NONE),
         viewportWidth(80), viewportHeight(25),
         gameOver(false), victory(false), seed(0) {}
-        viewportWidth(60), viewportHeight(20),
-        gameOver(false), victory(false), seed(0),
-        miningPending(false), minigameDamage(20) {}
-    
+
     // IMPORTANT: Don't copy GameState by value!
     // The world pointer will get double-freed and crash everything.
     // Always pass by reference: void doStuff(GameState& state)
