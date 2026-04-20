@@ -1,11 +1,5 @@
 /*
  * main.cpp
- *
- * Main entry point and game loop for TermiCraft.
- * This file ties everything together - menus, world, player, minigames, boss.
- *
- * The stub functions below are placeholders. Team members replace them
- * with their actual implementations.
  */
 
 #include <algorithm>
@@ -25,7 +19,6 @@
 #include "types.h"
 
 // ----- FORWARD DECLARATIONS -----
-// These are stubs - you guys will replace them with real code
 
 // Mohit - world generation and rendering
 void initWorld(GameState &state);
