@@ -31,7 +31,8 @@
 #include <iostream>
 #include <ctime>       // time() for HighScore.timestamp
 
-//using namespace std;
+using std::cout;
+using std::string;
 
 // =============================================================================
 // addScore
@@ -100,7 +101,7 @@ void saveFinalScore(GameState& state, bool defeatedDragon) {
     hs.playerName     = name;
     hs.score          = state.score;        // full run total (mining + boss)
     hs.difficulty     = state.difficulty;   // Difficulty enum from types.h
-    hs.timestamp      = time(nullptr);      // Unix timestamp for display/sorting
+    hs.timestamp      = std::time(nullptr); // Unix timestamp for display/sorting
     hs.defeatedDragon = defeatedDragon;     // false on death = partial score
 
     // --- Snapshot top score BEFORE saving ---
