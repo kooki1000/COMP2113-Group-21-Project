@@ -35,6 +35,7 @@
 
 #include <iostream>
 #include <iomanip>        // std::setw
+#include <cstdio>         // std::snprintf
 #include <sstream>
 #include <cstring>        // strlen, snprintf
 #include <cstdlib>        // rand, srand
@@ -43,7 +44,11 @@
 #include <fcntl.h>        // fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <unistd.h>       // usleep, read, STDIN_FILENO
 
-//using namespace std;
+using std::cout;
+using std::max;
+using std::min;
+using std::setw;
+using std::string;
 
 // =============================================================================
 // Dragon ASCII art — 3 phase variants
@@ -209,7 +214,7 @@ static string buildHPBar(int current, int maximum, int barWidth) {
     bar += "] ";
 
     char nums[24];
-    snprintf(nums, sizeof(nums), "%d/%d", current, maximum);
+    std::snprintf(nums, sizeof(nums), "%d/%d", current, maximum);
     bar += nums;
     return bar;
 }
@@ -229,13 +234,13 @@ static void buildHUDRow(int currentScore, const Dragon& dragon) {
 
     // Left: title + score
     char left[56];
-    snprintf(left, sizeof(left), " TERMICRAFT: THE LAIR   SCORE: %06d", currentScore);
+    std::snprintf(left, sizeof(left), " TERMICRAFT: THE LAIR   SCORE: %06d", currentScore);
 
     // Right: dragon HP bar
     string barStr;
     for (int i = 0; i < BAR_W; i++) barStr += (i < filled ? '|' : '.');
     char right[40];
-    snprintf(right, sizeof(right), "DRAGON:[%s]%3d%%", barStr.c_str(), pct);
+    std::snprintf(right, sizeof(right), "DRAGON:[%s]%3d%%", barStr.c_str(), pct);
 
     // Calculate padding so right section is flush with the right border
     int leftLen  = (int)strlen(left);
@@ -260,7 +265,7 @@ static void buildHUDRow(int currentScore, const Dragon& dragon) {
 static void buildPlayerHPRow(int playerHp, int playerMaxHp, const char* armorName) {
     string bar = buildHPBar(playerHp, playerMaxHp, 28);
     char line[80];
-    snprintf(line, sizeof(line), " PLAYER HP: %s  [%s]", bar.c_str(), armorName);
+    std::snprintf(line, sizeof(line), " PLAYER HP: %s  [%s]", bar.c_str(), armorName);
     safeSetStr(FF_HP_ROW, 1, line);
 }
 
