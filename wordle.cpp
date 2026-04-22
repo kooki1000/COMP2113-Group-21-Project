@@ -13,12 +13,45 @@
 #include "menu.h"
 #include "types.h"
 #include <cctype>
+#include <limits>
 #include <iostream>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
 #include <vector>
 #include <cstdlib>
+
+static void showWordleEndScreen(bool won, const std::string& target) {
+    if (won) {
+        std::cout << R"(
+   ██╗    ██╗ ██████╗ ███╗   ██╗
+   ██║    ██║██╔═══██╗████╗  ██║
+   ██║ █╗ ██║██║   ██║██╔██╗ ██║
+   ██║███╗██║██║   ██║██║╚██╗██║
+   ╚███╔███╔╝╚██████╔╝██║ ╚████║
+    ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝
+        )" << std::endl;
+
+        std::cout << COLOR_GREEN << "    Correct! You guessed the word.\n" << COLOR_RESET;
+    } else {
+    std::cout << R"(
+   ██████╗  █████╗ ███╗   ███╗███████╗
+  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝
+  ██║  ███╗███████║██╔████╔██║█████╗  
+  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  
+  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
+   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
+    )" << std::endl;
+
+    std::cout << COLOR_RED << "    The word was: " << COLOR_BOLD_WHITE;
+
+    for (char c : target)
+        std::cout << (char)toupper(c);
+
+    std::cout << COLOR_RESET << "\n";
+    }
+}
+
 
 // ─── WORD LISTS ───────────────────────────────────────────────────────────────
 
@@ -286,24 +319,13 @@ bool runWordle(int wordLength) {
 
     renderWordleBoard(guesses, target, wordLength);
 
-    if (won) {
-        std::cout << "\n" << COLOR_BOLD_GREEN
-                  << "    ╔══════════════════════════════════╗\n"
-                  << "    ║  🎉 Correct! You unlocked Iron! ║\n"
-                  << "    ╚══════════════════════════════════╝\n"
-                  << COLOR_RESET;
-    } else {
-        std::cout << "\n" << COLOR_BOLD_RED
-                  << "    ╔══════════════════════════════════╗\n"
-                  << "    ║  💀 Out of guesses!              ║\n"
-                  << "    ║  The word was: " << COLOR_BOLD_WHITE;
-        for (char c : target) std::cout << (char)toupper(c);
-        std::cout << COLOR_BOLD_RED << "          ║\n"
-                  << "    ╚══════════════════════════════════╝\n"
-                  << COLOR_RESET;
-    }
-
+clearScreen();
+std::cout << "\n";
+showWordleEndScreen(won, target);
+    
     std::cout << "\n" << COLOR_DIM << "    Press any key to continue..." << COLOR_RESET;
-    getchar();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    std::cin.get();
+
     return won;
 }
