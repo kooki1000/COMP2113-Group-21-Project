@@ -5,7 +5,7 @@
 | Name  | Student ID | Role                              |
 |-------|------------|-----------------------------------|
 | Sohan | 3036636025    | Boss fight, score system          |
-
+| Saarim| 3036520068    | Integration, menu, load/save, etc |
 ---
 
 ## Features Implemented
