@@ -15,8 +15,13 @@
 
 #include "colors.h"
 #include "fileio.h"
+#include "final_fight.h"
+#include "fog_of_war.h"
 #include "menu.h"
+#include "minesweeper.h"
+#include "player.h"
 #include "types.h"
+#include "world_gen.h"
 
 // ----- FORWARD DECLARATIONS -----
 
@@ -29,27 +34,22 @@ void updateWorldVisibility(GameState &state);
 // Koki - player movement, mining, crafting
 void initPlayer(GameState &state);
 void handlePlayerInput(GameState &state, char input);
-bool canMineBlock(const GameState &state, int x, int y);
-void mineBlock(GameState &state, int x, int y);
-void updateCrafting(GameState &state);
-bool canCraftTier(const GameState &state, MaterialTier tier);
-void craftEquipment(GameState &state, MaterialTier tier, bool isPickaxe);
+void resolveMiningAttempt(GameState &state, bool minigameWon);
 
-// Sohan - enemies and boss fight
-void spawnEnemies(GameState &state);
-void updateEnemies(GameState &state);
-void playerAttack(GameState &state);
+// Sohan - boss fight
 bool runBossFight(GameState &state);
 
 // Aryan & Nan - minigames
 bool runWordle(int wordLength);
 bool runMinesweeper(int gridSize);
+bool runSudoku(Difficulty diff);
 
 // ----- GLOBALS -----
 
 static GameState gameState;
 static bool gameRunning = true;
 static struct termios originalTermios;
+static bool terminalStateCaptured = false;
 
 // Random number generator - way better than rand()
 static std::mt19937 rng;
@@ -57,8 +57,12 @@ static std::mt19937 rng;
 // ----- TERMINAL SETUP -----
 
 void setupTerminal() {
-  // Save current terminal settings so we can restore later
-  tcgetattr(STDIN_FILENO, &originalTermios);
+  if (!terminalStateCaptured) {
+    // Save current terminal settings once so we always restore true original
+    // state
+    tcgetattr(STDIN_FILENO, &originalTermios);
+    terminalStateCaptured = true;
+  }
 
   // Raw mode - get keypresses immediately without waiting for Enter
   struct termios raw = originalTermios;
@@ -72,8 +76,10 @@ void setupTerminal() {
 }
 
 void restoreTerminal() {
-  // Put everything back the way it was
-  tcsetattr(STDIN_FILENO, TCSANOW, &originalTermios);
+  if (terminalStateCaptured) {
+    // Put everything back the way it was
+    tcsetattr(STDIN_FILENO, TCSANOW, &originalTermios);
+  }
   std::cout << CURSOR_SHOW;
   std::cout << COLOR_RESET;
   clearScreen();
@@ -85,31 +91,29 @@ void signalHandler(int signal) {
   exit(signal);
 }
 
-// ----- STUB IMPLEMENTATIONS -----
-// TEMPORARY - each member replaces these with their own .cpp file
-// These empty stubs only exist so the project compiles before everyone's code
-// is merged Mohit
-void initWorld(GameState &state) {}
-void generateWorld(GameState &state) {}
-void renderWorld(const GameState &state) {}
-void updateWorldVisibility(GameState &state) {}
-// Koki
-void initPlayer(GameState &state) {}
-void handlePlayerInput(GameState &state, char input) {}
-bool canMineBlock(const GameState &state, int x, int y) { return false; }
-void mineBlock(GameState &state, int x, int y) {}
-void updateCrafting(GameState &state) {}
-bool canCraftTier(const GameState &state, MaterialTier tier) { return false; }
-void craftEquipment(GameState &state, MaterialTier tier, bool isPickaxe) {}
-// Sohan
-void spawnEnemies(GameState &state) {}
-void updateEnemies(GameState &state) {}
-void playerAttack(GameState &state) {}
-bool runBossFight(GameState &state) { return false; }
-// Aryan
-bool runWordle(int wordLength) { return false; }
-// Nan
-bool runMinesweeper(int gridSize) { return false; }
+// ----- COMPAT BRIDGES -----
+void initPlayer(GameState &state) {
+  const std::string playerName =
+      state.player.name.empty() ? "Player" : state.player.name;
+  initPlayer(state, playerName);
+}
+
+void handlePlayerInput(GameState &state, char input) {
+  handleInput(state, input);
+}
+
+// ----- TEMP STUBS FOR YET-TO-BE-FINALIZED MODULES -----
+
+static bool runPendingMinigame(GameState &state) {
+  switch (state.currentMinigame) {
+  case MINIGAME_WORDLE:
+    return runWordle(state.settings.wordleWordLength);
+  case MINIGAME_MINESWEEPER:
+    return runMinesweeper(state.settings.minesweeperSize);
+  default:
+    return false;
+  }
+}
 
 // ----- GAME INIT/CLEANUP -----
 
@@ -121,11 +125,8 @@ void initGame(GameState &state, Difficulty difficulty, bool isNewGame) {
   state.victory = false;
   state.score = 0;
   state.oresMined = 0;
-  state.enemiesKilled = 0;
-  state.dragonCaveFound = false;
   state.dragonDefeated = false;
   state.minigameActive = false;
-  state.enemies.clear();
 
   if (isNewGame) {
     state.seed = static_cast<unsigned int>(time(nullptr));
@@ -146,8 +147,6 @@ void cleanupGame(GameState &state) {
     delete[] state.world;
     state.world = nullptr;
   }
-
-  state.enemies.clear();
 }
 
 // ----- GAME LOOP -----
@@ -156,8 +155,51 @@ void runGameLoop() {
   while (gameRunning && !gameState.gameOver && !gameState.victory) {
 
     /* minigame trigger when everyone completes their part #DONT TOUCH */
+    if (gameState.phase == PHASE_MINIGAME && gameState.minigameActive) {
+      restoreTerminal();
+      bool minigameWon = runPendingMinigame(gameState);
+      setupTerminal();
+
+      if (gameState.miningPending) {
+        resolveMiningAttempt(gameState, minigameWon);
+      } else {
+        if (minigameWon) {
+          confirmUpgrade(gameState);
+        } else {
+          gameState.minigameActive = false;
+          gameState.currentMinigame = MINIGAME_NONE;
+          gameState.pendingUpgrade = MATERIAL_NONE;
+          gameState.lastMessage = "upgrade challenge failed.";
+        }
+      }
+
+      gameState.phase = gameState.player.alive ? PHASE_PLAYING : PHASE_GAMEOVER;
+      if (!gameState.player.alive) {
+        gameState.gameOver = true;
+      }
+      continue;
+    }
 
     // final fight trigger #DONT TOUCH
+    if (gameState.phase == PHASE_BOSS) {
+      restoreTerminal();
+      bool bossWon = runBossFight(gameState);
+      setupTerminal();
+
+      gameState.phase = bossWon ? PHASE_VICTORY : PHASE_GAMEOVER;
+      if (!bossWon) {
+        gameState.gameOver = true;
+      } else {
+        gameState.victory = true;
+      }
+      continue;
+    }
+    if (gameState.phase == PHASE_MENU) {
+      gameRunning = false;
+      break;
+    }
+
+    updateWorldVisibility(gameState);
 
     // Draw the world
     renderWorld(gameState);
@@ -195,14 +237,36 @@ void runGameLoop() {
           }
         }
         break;
+      case ' ': {
+        int tx = gameState.player.pos.x + gameState.player.facingX;
+        int ty = gameState.player.pos.y + gameState.player.facingY;
+        if (tx >= 0 && tx < gameState.worldWidth && ty >= 0 &&
+            ty < gameState.worldHeight) {
+          if (gameState.world[ty][tx].type == BLOCK_DRAGON_CAVE) {
+            bool enter = true;
+            if (gameState.player.equipment.armor < MATERIAL_DIAMOND) {
+              enter = showConfirmation(
+                  "WARNING: Low armor! Enter Dragon Cave anyway?");
+            } else {
+              enter = showConfirmation("Enter the Dragon Cave?");
+            }
+
+            if (enter) {
+              gameState.phase = PHASE_BOSS;
+            }
+            break;
+          }
+        }
+        handlePlayerInput(gameState, input);
+        break;
+      }
       default:
         handlePlayerInput(gameState, input);
         break;
       }
     }
 
-    // Update enemies
-    updateEnemies(gameState);
+    updatePhysics(gameState);
   }
 }
 
@@ -217,10 +281,9 @@ int main() {
   rng.seed(static_cast<unsigned int>(time(nullptr)));
 
   bool exitGame = false;
+  setupTerminal();
 
   while (!exitGame) {
-    setupTerminal();
-
     HighScore topScore = getTopHighScore();
     int choice = showMainMenu(topScore);
 
@@ -233,8 +296,8 @@ int main() {
       std::string name = getPlayerName("Enter your name");
       setupTerminal();
 
-      initGame(gameState, diff, true);
       gameState.player.name = name;
+      initGame(gameState, diff, true);
 
       gameRunning = true;
       runGameLoop();
@@ -247,7 +310,7 @@ int main() {
 
         showGameOver(gameState, gameState.victory);
 
-        //show high score (sohan score.cpp)
+        // show high score (sohan score.cpp)
       }
 
       cleanupGame(gameState);
@@ -270,7 +333,7 @@ int main() {
             // gameState.settings.scoreMultiplier);
             showGameOver(gameState, gameState.victory);
 
-           //show score by sohans file
+            // show score by sohans file
           }
 
           cleanupGame(gameState);
