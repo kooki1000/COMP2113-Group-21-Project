@@ -46,6 +46,23 @@ private:
     double getElapsedTime() const;
 };
 
+void writeHighScore(double time) {
+    std::string filename = "highscore.txt";
+    double bestTime = 999999.0;   
+    std::ifstream fin(filename);
+    if (fin) {
+        fin >> bestTime;
+        fin.close();
+    }
+    if (time < bestTime) {
+        std::ofstream fout(filename);
+        if (fout) {
+            fout << time;
+            fout.close();
+            std::cout << "New high score! Time: " << time << " seconds" << std::endl;
+        }
+    }
+}
 void Minesweeper::clearScreen(){
     for(int i=0; i<100; i++){
         std::cout << std::endl;
@@ -292,27 +309,4 @@ Minesweeper::Minesweeper(int s, int m) : size(s), mines(m) {
     startTime = std::chrono::steady_clock::now();
 }
 
-void writeHighScore(double time) {
-    std::string filename = "highscore.txt";
-    double bestTime = 999999.0;   
-    std::ifstream fin(filename);
-    if (fin) {
-        fin >> bestTime;
-        fin.close();
-    }
-    if (time < bestTime) {
-        std::ofstream fout(filename);
-        if (fout) {
-            fout << time;
-            fout.close();
-            std::cout << "New high score! Time: " << time << " seconds" << std::endl;
-        }
-    }
-}
 
-
-int main() {
-    Minesweeper game(easygrid, easymine);
-    game.playGame();
-    return 0;
-}
