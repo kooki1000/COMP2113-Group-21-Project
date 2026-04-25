@@ -70,3 +70,5 @@ void showInventory(const GameState& state);
 
 // Show a status message at bottom of screen
 void showStatusMessage(const std::string& message, bool isError = false);
+
+#endif // MENU_H

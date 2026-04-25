@@ -6,12 +6,78 @@
 
 #include "menu.h"
 #include "colors.h"
+#include <clocale>
 #include <cstdio>
+#include <cwchar>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <termios.h>
 #include <unistd.h>
+#include <wchar.h>
+
+namespace {
+std::string stripAnsi(const std::string &text) {
+  std::string out;
+  out.reserve(text.size());
+
+  for (std::size_t i = 0; i < text.size();) {
+    unsigned char ch = static_cast<unsigned char>(text[i]);
+    if (ch == 0x1B && i + 1 < text.size() && text[i + 1] == '[') {
+      i += 2;
+      while (i < text.size()) {
+        unsigned char code = static_cast<unsigned char>(text[i]);
+        if (code >= 0x40 && code <= 0x7E) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    out.push_back(text[i]);
+    i++;
+  }
+
+  return out;
+}
+
+int displayWidth(const std::string &text) {
+  static bool localeSet = (std::setlocale(LC_CTYPE, ""), true);
+  (void)localeSet;
+
+  std::string clean = stripAnsi(text);
+  int width = 0;
+  std::mbstate_t state{};
+  const char *ptr = clean.c_str();
+  std::size_t remaining = clean.size();
+
+  while (remaining > 0) {
+    wchar_t wc = 0;
+    std::size_t consumed = std::mbrtowc(&wc, ptr, remaining, &state);
+
+    if (consumed == static_cast<std::size_t>(-1) ||
+        consumed == static_cast<std::size_t>(-2)) {
+      state = std::mbstate_t{};
+      width += 1;
+      ptr++;
+      remaining--;
+      continue;
+    }
+
+    if (consumed == 0) {
+      break;
+    }
+
+    int charWidth = wcwidth(wc);
+    width += (charWidth >= 0) ? charWidth : 1;
+    ptr += consumed;
+    remaining -= consumed;
+  }
+
+  return width;
+}
+} // namespace
 
 // ----- INPUT HELPERS -----
 
@@ -103,7 +169,9 @@ void showBox(const std::vector<std::string> &lines, int width) {
 
   for (const std::string &line : lines) {
     std::cout << "    ║" << COLOR_WHITE;
-    int padding = width - line.length();
+    int padding = width - displayWidth(line);
+    if (padding < 0)
+      padding = 0;
     int leftPad = padding / 2;
     int rightPad = padding - leftPad;
     for (int i = 0; i < leftPad; i++)
@@ -140,21 +208,29 @@ int showMainMenu(const HighScore &highScore) {
     std::cout << "\n";
     std::cout << COLOR_YELLOW
               << "                    🏆 HIGH SCORE: " << COLOR_BOLD_YELLOW;
-    std::cout << highScore.score;
-    std::cout << COLOR_YELLOW << " ("
-              << getDifficultyColor(highScore.difficulty);
-    switch (highScore.difficulty) {
-    case DIFF_EASY:
-      std::cout << "EASY";
-      break;
-    case DIFF_NORMAL:
-      std::cout << "NORMAL";
-      break;
-    case DIFF_HARD:
-      std::cout << "HARD";
-      break;
+    bool hasRealHighScore =
+        !(highScore.playerName == "---" && highScore.score == 0 &&
+          highScore.timestamp == 0 && !highScore.defeatedDragon);
+
+    if (!hasRealHighScore) {
+      std::cout << "---" << COLOR_RESET << "\n";
+    } else {
+      std::cout << highScore.score;
+      std::cout << COLOR_YELLOW << " ("
+                << getDifficultyColor(highScore.difficulty);
+      switch (highScore.difficulty) {
+      case DIFF_EASY:
+        std::cout << "EASY";
+        break;
+      case DIFF_NORMAL:
+        std::cout << "NORMAL";
+        break;
+      case DIFF_HARD:
+        std::cout << "HARD";
+        break;
+      }
+      std::cout << COLOR_YELLOW << ")" << COLOR_RESET << "\n";
     }
-    std::cout << COLOR_YELLOW << ")" << COLOR_RESET << "\n";
 
     if (highScore.defeatedDragon) {
       std::cout << COLOR_GREEN << "                    🐉 Dragon Slayer: "
@@ -195,10 +271,12 @@ Difficulty selectDifficulty() {
       std::cout << COLOR_DIM << "                 ";
     }
     std::cout << "[1] EASY" << COLOR_RESET << "\n";
-    std::cout
-        << COLOR_DIM
-        << "                     • 150 HP  • More ores  • Fewer enemies\n";
+    // std::cout << COLOR_DIM
+    //           << "                     • 150 HP  • More ores  • Fewer
+    //           enemies\n";
+    std::cout << COLOR_DIM << "                     • 150 HP  • More ores\n";
     std::cout << "                     • 4-letter Wordle  • 6x6 Minesweeper\n";
+    std::cout << "                     • 6x6 Sudoku (Easy)\n";
     std::cout << "                     • Score: 1.0x multiplier\n\n"
               << COLOR_RESET;
 
@@ -209,10 +287,14 @@ Difficulty selectDifficulty() {
       std::cout << COLOR_DIM << "                 ";
     }
     std::cout << "[2] NORMAL" << COLOR_RESET << "\n";
+    // std::cout << COLOR_DIM
+    //           << "                     • 100 HP  • Standard ores  • Standard
+    //           "
+    //              "enemies\n";
     std::cout << COLOR_DIM
-              << "                     • 100 HP  • Standard ores  • Standard "
-                 "enemies\n";
+              << "                     • 100 HP  • Standard ores\n";
     std::cout << "                     • 5-letter Wordle  • 8x8 Minesweeper\n";
+    std::cout << "                     • 6x6 Sudoku (Hard)\n";
     std::cout << "                     • Score: 1.5x multiplier\n\n"
               << COLOR_RESET;
 
@@ -223,11 +305,13 @@ Difficulty selectDifficulty() {
       std::cout << COLOR_DIM << "                 ";
     }
     std::cout << "[3] HARD" << COLOR_RESET << "\n";
-    std::cout
-        << COLOR_DIM
-        << "                     • 75 HP  • Scarce ores  • Many enemies\n";
+    // std::cout << COLOR_DIM
+    //           << "                     • 75 HP  • Scarce ores  • Many
+    //           enemies\n";
+    std::cout << COLOR_DIM << "                     • 75 HP  • Scarce ores\n";
     std::cout
         << "                     • 6-letter Wordle  • 10x10 Minesweeper\n";
+    std::cout << "                     • 9x9 Sudoku\n";
     std::cout << "                     • Score: 2.0x multiplier\n\n"
               << COLOR_RESET;
 
@@ -401,16 +485,17 @@ void showHowToPlay() {
   std::cout << "    1. Chop trees for wood\n";
   std::cout << "    2. Craft wooden pickaxe to mine stone\n";
   std::cout << "    3. Each tier upgrade requires winning a minigame!\n";
-  std::cout << "    4. Get full Diamond armor to access the Dragon Cave\n";
+  std::cout << "    4. Find the Dragon Cave to face the final boss (Diamond "
+               "Armor recommended)\n";
   std::cout << "    5. Defeat the Dragon in Space Invaders-style combat!\n\n";
 
   std::cout << COLOR_BOLD_CYAN << "    MINIGAMES:\n" << COLOR_RESET;
   std::cout << "    • " << COLOR_GREEN << "Wordle" << COLOR_RESET
-            << " - Guess the word to unlock Iron\n";
+            << " - Guess the word to upgrade tiers\n";
   std::cout << "    • " << COLOR_YELLOW << "Minesweeper" << COLOR_RESET
-            << " - Clear the grid to unlock Gold\n";
-  std::cout << "    • " << COLOR_CYAN << "Space Invaders" << COLOR_RESET
-            << " - Final boss battle!\n\n";
+            << " - Clear the grid to upgrade tiers\n";
+  std::cout << "    • " << COLOR_CYAN << "Sudoku" << COLOR_RESET
+            << " - Fill the grid to upgrade tiers\n\n";
 
   std::cout << COLOR_DIM << "    Press any key to return to menu..."
             << COLOR_RESET;
@@ -439,10 +524,6 @@ void showGameOver(const GameState &state, bool isVictory) {
 
   std::cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
   std::cout << "  Ores Mined:     " << std::setw(15) << state.oresMined;
-  std::cout << COLOR_CYAN << " ║\n";
-
-  std::cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
-  std::cout << "  Enemies Killed: " << std::setw(15) << state.enemiesKilled;
   std::cout << COLOR_CYAN << " ║\n";
 
   std::cout << COLOR_CYAN << "                    ║" << COLOR_WHITE;
@@ -559,7 +640,10 @@ void renderHUD(const GameState &state) {
   std::cout << COLOR_RESET;
 
   // Depth and position
-  std::cout << "  Depth: " << (state.player.pos.y - SURFACE_LEVEL);
+  int depth = state.player.pos.y - SURFACE_LEVEL;
+  if (depth < 0)
+    depth = 0;
+  std::cout << "  Depth: " << depth;
   std::cout << "  Pos: (" << state.player.pos.x << ", " << state.player.pos.y
             << ")";
   std::cout << "\n";
