@@ -36,6 +36,7 @@ private:
     void gameOverMessage();
     void getPlayerInput();
     char toUpper(char c);
+    void printInstructions();
     double getElapsedTime() const;
 };
 
@@ -58,6 +59,15 @@ void writeHighScore(double time) {
 }
 void Minesweeper::clearScreen() {
     std::system("clear");
+}
+
+void Minesweeper::printInstructions() {
+    std::cout << "+----------------------------------------+\n";
+    std::cout << "| Minesweeper Rules                      |\n";
+    std::cout << "| R <row> <col>  : reveal cell          |\n";
+    std::cout << "| F <row> <col>  : flag as mine         |\n";
+    std::cout << "| Row/col in 0–" << (size - 1) << "          |\n";
+    std::cout << "+----------------------------------------+\n\n";
 }
 
 char Minesweeper::toUpper(char c){
@@ -238,21 +248,14 @@ void Minesweeper::gameOverMessage(){
 }
 
 void Minesweeper::getPlayerInput(){
-    void Minesweeper::getPlayerInput(){
     int x, y;
     char action;
-    std::cout << "Enter your move (ACTION ROW COLUMN): ";
-    std::cout << "\n  R <row> <col> to reveal, F <row> <col> to flag\n";
-    std::cout << "  Example: R 0 0\n";
-    std::cout << "  Action: ";
-    std::cin >> action;
-    std::cout << "  Row: ";
-    std::cin >> x;
-    std::cout << "  Col: ";
-    std::cin >> y;
+
+    std::cout << "Move (R/F row col): ";
+    std::cin >> action >> x >> y;
+
     action = toUpper(action);
     makeMove(action, x, y);
-}
 }
 
 void Minesweeper::makeMove(char action, int x, int y){
@@ -277,8 +280,12 @@ void Minesweeper::makeMove(char action, int x, int y){
 }
 
 bool Minesweeper::playGame(){
+    clearScreen();
+    printInstructions();
+    displayBoard();
     while (!gameOver) {
         clearScreen();
+        printInstructions();
         displayBoard();
         if (checkWin()) {
             win = true;
