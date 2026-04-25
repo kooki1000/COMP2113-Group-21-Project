@@ -56,10 +56,8 @@ void writeHighScore(double time) {
         }
     }
 }
-void Minesweeper::clearScreen(){
-    for(int i=0; i<100; i++){
-        std::cout << std::endl;
-    }
+void Minesweeper::clearScreen() {
+    std::system("clear");
 }
 
 char Minesweeper::toUpper(char c){
@@ -89,14 +87,14 @@ int Minesweeper::countAdjacentMines(int x, int y) {
 }
 
 void Minesweeper::displayBoard() {
-    std::cout << "   ";
+    std::cout << "  ";              
     for (int i = 0; i < size; ++i) {
         std::cout << i << " ";
     }
     std::cout << std::endl;
 
     for (int i = 0; i < size; ++i) {
-        std::cout << i << " ";
+        std::cout << i << " ";      
         for (int j = 0; j < size; ++j) {
             if (revealedGrid[i][j] == 'F') {
                 std::cout << "F ";
@@ -240,12 +238,21 @@ void Minesweeper::gameOverMessage(){
 }
 
 void Minesweeper::getPlayerInput(){
+    void Minesweeper::getPlayerInput(){
     int x, y;
     char action;
-    std::cout << "Enter your move (action row column): ";
-    std::cin >> action >> x >> y;
+    std::cout << "Enter your move (ACTION ROW COLUMN): ";
+    std::cout << "\n  R <row> <col> to reveal, F <row> <col> to flag\n";
+    std::cout << "  Example: R 0 0\n";
+    std::cout << "  Action: ";
+    std::cin >> action;
+    std::cout << "  Row: ";
+    std::cin >> x;
+    std::cout << "  Col: ";
+    std::cin >> y;
     action = toUpper(action);
     makeMove(action, x, y);
+}
 }
 
 void Minesweeper::makeMove(char action, int x, int y){
