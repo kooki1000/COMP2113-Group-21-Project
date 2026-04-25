@@ -225,7 +225,7 @@ void renderCraftingUI(const GameState& state, int selectedIndex) {
     std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
     std::cout << COLOR_BOLD_WHITE << "Selected: " << COLOR_RESET;
     if (visible) {
-        std::cout << getTierColor(selected.tier) << selected.displayName << COLOR_RESET;
+        std::cout << getMaterialColor(selected.tier) << selected.displayName << COLOR_RESET;
     } else {
         std::cout << COLOR_DIM << "??? (Complete previous tier)" << COLOR_RESET;
     }
