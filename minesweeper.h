@@ -7,7 +7,7 @@
 class Minesweeper {
 public:
     Minesweeper(int size, int mines);
-    void playGame();
+    bool playGame();
 
 private:
     int size;
@@ -39,5 +39,6 @@ private:
     void gameOverMessage();
 
 };
+bool runMinesweeper(int gridSize);
 
 #endif
