@@ -6,20 +6,13 @@
 #include <fstream>
 #include <chrono>
 
-const int easygrid = 5;
-const int mediumgrid = 10;
-const int hardgrid = 15;
-const int easymine = 5;
-const int mediummine = 10;
-const int hardmine = 20;
-
 class Minesweeper {
 public:
     Minesweeper(int size, int mines);
     void initializeGrids(int size);
     void displayBoard();
     void clearScreen();
-    void playGame();
+    bool playGame();
     void makeMove(char action, int x, int y);
 
 private:
@@ -276,7 +269,7 @@ void Minesweeper::makeMove(char action, int x, int y){
     }
 }
 
-void Minesweeper::playGame(){
+bool Minesweeper::playGame(){
     while (!gameOver) {
         clearScreen();
         displayBoard();
@@ -291,12 +284,17 @@ void Minesweeper::playGame(){
     revealMines();
     displayBoard();
     gameOverMessage();
+    return win;
 }
 
 double Minesweeper::getElapsedTime() const {
     auto endTime = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
     return elapsed.count()/1000.0;
+}
+bool runMinesweeper(int gridSize){
+    Minesweeper game(gridSize, (gridSize*gridSize)/6);
+    return game.playGame();
 }
 
 Minesweeper::Minesweeper(int s, int m) : size(s), mines(m) {
