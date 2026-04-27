@@ -14,6 +14,7 @@ public:
     void clearScreen();
     bool playGame();
     void makeMove(char action, int x, int y);
+    int gameState; //lose, win, or escape
 
 private:
     int size;
@@ -40,7 +41,7 @@ private:
     double getElapsedTime() const;
 };
 
-void writeHighScore(double time) {
+void writeHighScore(double time) {//creates high score file and writes to it
     std::string filename = "highscore.txt";
     double bestTime = 999999.0;   
     std::ifstream fin(filename);
@@ -251,10 +252,13 @@ void Minesweeper::getPlayerInput(){
     int x, y;
     char action;
 
-    std::cout << "Move (R/F row col): ";
+    std::cout << "Move (R/F row col) or enter 'Q 0 0' to quit: ";
     std::cin >> action >> x >> y;
-
     action = toUpper(action);
+    if(action == 'Q'){
+        gameState=2;
+        gameOver = true;
+    };
     makeMove(action, x, y);
 }
 
@@ -264,6 +268,7 @@ void Minesweeper::makeMove(char action, int x, int y){
     if (action == 'R') {
         if(mineGrid[x][y]){
             gameOver = true;
+            gameState=1;
             return;
         }
         if (revealedGrid[x][y] == '#') {
@@ -289,6 +294,7 @@ bool Minesweeper::playGame(){
         displayBoard();
         if (checkWin()) {
             win = true;
+            gameState = 0;
             gameOver = true;
         } else {
             getPlayerInput();
@@ -318,6 +324,7 @@ Minesweeper::Minesweeper(int s, int m) : size(s), mines(m) {
     fillSolutionGrid();
     gameOver = false;
     win = false;
+    gameState= -1;
     startTime = std::chrono::steady_clock::now();
 }
 
