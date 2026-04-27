@@ -27,6 +27,9 @@
 // Initialize player at game start (spawns at dragon carcass)
 void initPlayer(GameState& state, const std::string& playerName);
 
+// Initialize ore minigame assignments (called once per new game)
+void initializeOreMinigames(GameState& state);
+
 // Main entry point: processes a single keypress from main loop
 void handleInput(GameState& state, char input);
 
@@ -37,7 +40,7 @@ void updatePhysics(GameState& state);
 bool movePlayer(GameState& state, int dx, int dy);
 
 // Mine the block the player is facing (using facingX/facingY)
-void mineFacingBlock(GameState& state);
+void initiateMining(GameState& state);
 
 // Check if current tool can mine a specific block type
 bool canPlayerMine(const GameState& state, BlockType block);
@@ -65,6 +68,9 @@ bool checkCraftingProgression(GameState& state);
 
 // Confirm upgrade after minigame victory (called by main.cpp)
 void confirmUpgrade(GameState& state);
+
+// Resolve mining attempt after minigame completes (or immediate mining)
+void resolveMiningAttempt(GameState& state, MinigameResult result);
 
 // Enemy spawn roll (called after successful mine)
 void trySpawnEnemy(GameState& state, Position minedPos);
