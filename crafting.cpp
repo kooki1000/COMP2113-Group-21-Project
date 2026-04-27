@@ -38,6 +38,7 @@
 #include "colors.h"
 #include "menu.h"    // For getch() and clearScreen()
 #include "player.h"  // For checkCraftingProgression() and healPlayer()
+#include "utils.h"
 
 // Recipe definitions matching the progression chart
 const CraftingRecipe RECIPES[] = {
@@ -73,30 +74,6 @@ const CraftingRecipe RECIPES[] = {
 
 const int NUM_RECIPES = sizeof(RECIPES) / sizeof(RECIPES[0]);
 const int INNER_WIDTH = 78;  // Width between the ║ and ║ borders
-
-// Helper: Strip ANSI escape codes to calculate visible width
-std::string stripAnsi(const std::string& text) {
-    std::string out;
-    out.reserve(text.size());
-    for (size_t i = 0; i < text.size();) {
-        if (text[i] == '\033' && i + 1 < text.size() && text[i + 1] == '[') {
-            i += 2;
-            while (i < text.size() && !(text[i] >= 0x40 && text[i] <= 0x7E)) {
-                i++;
-            }
-            if (i < text.size()) i++;  // Skip the final letter
-        } else {
-            out.push_back(text[i]);
-            i++;
-        }
-    }
-    return out;
-}
-
-// Helper: Calculate display width (visible characters only)
-int displayWidth(const std::string& text) {
-    return stripAnsi(text).length();
-}
 
 // Helper: Check if recipe is visible (prereqs met) vs locked
 bool isRecipeVisible(const GameState& state, const CraftingRecipe& recipe) {
