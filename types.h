@@ -24,7 +24,13 @@ const int STONE_LEVEL = 12;   // stone layer begins
 const int GOLD_LEVEL = 30;    // gold layer begins
 const int DIAMOND_LEVEL = 50; // diamond layer begins
 const int DEEP_LEVEL = 25;    // rare ores spawn below this
-const int MINIGAME_COUNT = 3; // wordle + minesweeper + sudoku
+const int MINIGAME_COUNT = 4; // wordle + minesweeper + sudoku + placeholder
+
+// Flight limit (cannot fly above this row, 0 is top)
+const int MAX_FLIGHT_HEIGHT = 5;
+
+// Random number generator - way better than rand()
+std::mt19937 rng;
 
 // Block types - used in the world grid
 enum BlockType {
@@ -67,7 +73,15 @@ enum MinigameType {
   MINIGAME_NONE = 0,
   MINIGAME_WORDLE = 1,
   MINIGAME_MINESWEEPER = 2,
-  MINIGAME_SUDOKU = 3
+  MINIGAME_SUDOKU = 3,
+  MINIGAME_PLACEHOLDER_4TH = 4
+};
+
+// Minigame results
+enum MinigameResult {
+  MINIGAME_WIN = 0,
+  MINIGAME_LOSE = 1,
+  MINIGAME_ESCAPE = 2
 };
 
 // What phase the game is in
@@ -224,7 +238,18 @@ struct GameState {
   Position pendingMinePos;   // Target block coordinates
   BlockType pendingMineType; // What we're trying to mine
   bool miningPending;        // True if waiting for minigame result
-
+  
+  // Resource counters (track all-time mined amounts)
+  int woodMinedCount;
+  int stoneMinedCount;
+  int ironMinedCount;
+  int goldMinedCount;
+  int diamondMinedCount;
+  
+  // Minigame assignment system (Stone=0, Iron=1, Gold=2, Diamond=3)
+  MinigameType oreMinigameSlots[4];  // Which minigame assigned to which ore
+  bool oreMinigameTriggered[4];      // Whether each ore's minigame has been attempted
+  bool minigameSlotsInitialized;     // Flag to ensure shuffle happens once
 
   GameState()
       : phase(PHASE_MENU), difficulty(DIFF_NORMAL), world(nullptr),
@@ -232,7 +257,15 @@ struct GameState {
         dragonDefeated(false), score(0), oresMined(0),
         currentMinigame(MINIGAME_NONE), minigameActive(false),
         pendingUpgrade(MATERIAL_NONE), viewportWidth(80), viewportHeight(25),
-        gameOver(false), victory(false), seed(0), miningPending(false) {}
+        gameOver(false), victory(false), seed(0), miningPending(false),
+        woodMinedCount(0), stoneMinedCount(0), ironMinedCount(0), 
+        goldMinedCount(0), diamondMinedCount(0), minigameSlotsInitialized(false) {
+    // Initialize arrays
+    for (int i = 0; i < 4; i++) {
+      oreMinigameSlots[i] = MINIGAME_NONE;
+      oreMinigameTriggered[i] = false;
+    }
+  }
 
   // IMPORTANT: Don't copy GameState by value!
   // The world pointer will get double-freed and crash everything.
