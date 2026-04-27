@@ -1,9 +1,30 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <fstream>
+#include <sstream>
+
+std::vector<std::vector<std::string>> readCSV(const std::string& filename) {
+    std::vector<std::vector<std::string>> data;
+    std::ifstream file(filename);
+    std::string line;
+    
+    while (std::getline(file, line)) {
+        std::vector<std::string> row;
+        std::stringstream ss(line);
+        std::string cell;
+        
+        while (std::getline(ss, cell, ',')) {
+            row.push_back(cell);
+        }
+        data.push_back(row);
+    }
+    
+    return data;
+}
 
 struct card{
-    string face;
+    std::string face;
     int value;
     int suit;
 };
@@ -13,59 +34,57 @@ class TwentyFour{
         void play();
     private:
         void printCards(card c);
-        vector<card> deck;
-        vector<card> picked;
+        std::vector<card> deck;
+        std::vector<card> picked;
+        std::vector<std::vector<std::string>> allpuzzles;
+        void pickCards();
 };
 
 
 void TwentyFour::printCards(card c){
-    string suit_symbol;
+    std::string suit_symbol;
     if (c.suit == 0) suit_symbol = "♥";
     else if (c.suit == 1) suit_symbol = "♦";
     else if (c.suit == 2) suit_symbol = "♣";
     else suit_symbol = "♠";
-    cout << "┌─────────┐\n";
-    cout << "│" << c.value << "       │\n";
-    cout << "│         │\n";
-    cout << "│    " << suit_symbol << "    │\n";
-    cout << "│         │\n";
-    cout << "│       " << c.face << "│\n";
-    cout << "└─────────┘\n";
+    std::cout << "┌─────────┐\n";
+    std::cout << "│" << c.value << "       │\n";
+    std::cout << "│         │\n";
+    std::cout << "│    " << suit_symbol << "    │\n";
+    std::cout << "│         │\n";
+    std::cout << "│       " << c.face << "│\n";
+    std::cout << "└─────────┘\n";
 }
 
-void TwentyFour::generateCards(){
-    vector<card> deck;
-    string faces[] = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
-    for (int i = 0; i < 13; i++) {
-        deck.push_back({faces[i], i + 1, 0});
-        deck.push_back({faces[i], i + 1, 1});
-        deck.push_back({faces[i], i + 1, 2});
-        deck.push_back({faces[i], i + 1, 3});
-    }
-    return deck;
-}
 
 void TwentyFour::pickCards(){
-    for(int i = 0; i<4; i++){
-        int x = rand() % (52-i);
-        picked.push_back(deck[x]);
-        deck.erase(deck.begin() + x);
-    }
-}
-
-vector<vector<string>> allcombinations(vector<card> picked) {
-    vector<vector<string>> result;
-    // Generate all combinations of the picked cards
-    for (int i = 0; i < picked.size(); i++) {
-        for (int j = i + 1; j < picked.size(); j++) {
-            result.push_back({picked[i].face, picked[j].face});
+    int puzzleNumber = rand()%1363;
+    std::string puzzle = allpuzzles[puzzleNumber][0].substr(1, allpuzzles[puzzleNumber][0].size() - 2);
+    std::stringstream ss(puzzle);
+    std::string value;
+    while (std::getline(ss, value, ',')) {
+        card c;
+        if(stoi(value)==11){
+            c.face = "J";
         }
+        else if(stoi(value)==12){
+            c.face = "Q";
+        }
+        else if(stoi(value)==13){
+            c.face = "K";
+        }
+        else if(stoi(value)==1){
+            c.face = "A";
+        }
+        else{
+            c.face = value;
+        }
+        c.value = stoi(value);
+        c.suit = rand() % 4;
+        picked.push_back(c);
     }
-    return result;
 }
 
-bool has_solution(vector<card> cards){
-    if (cards.size()==1){
-        
-    }
+bool evaluateInput(std::string expression){
+    
 }
