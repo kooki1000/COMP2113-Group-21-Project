@@ -6,6 +6,13 @@
 #include <fstream>
 #include <chrono>
 
+enum class MinigameResult {
+  MINIGAME_WIN = 0,
+  MINIGAME_LOSE = 1,
+  MINIGAME_ESCAPE = 2
+};
+
+
 class Minesweeper {
 public:
     Minesweeper(int size, int mines);
@@ -14,7 +21,7 @@ public:
     void clearScreen();
     bool playGame();
     void makeMove(char action, int x, int y);
-    int gameState; //lose, win, or escape
+    MinigameResult gameState; //lose, win, or escape
 
 private:
     int size;
@@ -256,7 +263,7 @@ void Minesweeper::getPlayerInput(){
     std::cin >> action >> x >> y;
     action = toUpper(action);
     if(action == 'Q'){
-        gameState=2;
+        gameState=MINIGAME_ESCAPE;
         gameOver = true;
     };
     makeMove(action, x, y);
@@ -268,7 +275,7 @@ void Minesweeper::makeMove(char action, int x, int y){
     if (action == 'R') {
         if(mineGrid[x][y]){
             gameOver = true;
-            gameState=1;
+            gameState=MINIGAME_LOSE;
             return;
         }
         if (revealedGrid[x][y] == '#') {
@@ -284,7 +291,7 @@ void Minesweeper::makeMove(char action, int x, int y){
     }
 }
 
-bool Minesweeper::playGame(){
+MinigameResult Minesweeper::playGame(){
     clearScreen();
     printInstructions();
     displayBoard();
@@ -294,7 +301,7 @@ bool Minesweeper::playGame(){
         displayBoard();
         if (checkWin()) {
             win = true;
-            gameState = 0;
+            gameState = MINIGAME_WIN;
             gameOver = true;
         } else {
             getPlayerInput();
@@ -304,7 +311,7 @@ bool Minesweeper::playGame(){
     revealMines();
     displayBoard();
     gameOverMessage();
-    return win;
+    return gameState;
 }
 
 double Minesweeper::getElapsedTime() const {
@@ -324,7 +331,7 @@ Minesweeper::Minesweeper(int s, int m) : size(s), mines(m) {
     fillSolutionGrid();
     gameOver = false;
     win = false;
-    gameState= -1;
+    gameState = MinigameResult::MINIGAME_LOSE;
     startTime = std::chrono::steady_clock::now();
 }
 
