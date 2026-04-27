@@ -43,6 +43,7 @@
 #include <algorithm>      // std::max, std::min
 #include <fcntl.h>        // fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <unistd.h>       // usleep, read, STDIN_FILENO
+#include <sys/ioctl.h>    // ioctl, TIOCGWINSZ — terminal size check
 
 using std::cout;
 using std::max;
@@ -750,7 +751,32 @@ bool runBossFight(GameState& state) {
     bool running     = true;
 
     // -------------------------------------------------------------------------
-    // 2. Intro screen (blocking input, before O_NONBLOCK is set)
+    // 2. Terminal size check
+    // Warn if terminal is too small. Uses TIOCGWINSZ from <sys/ioctl.h>.
+    // The fight will still run but may render incorrectly if terminal < 100x35.
+    // -------------------------------------------------------------------------
+    {
+        struct winsize ws;
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0) {
+            if (ws.ws_col < FF_ARENA_WIDTH || ws.ws_row < FF_ARENA_HEIGHT) {
+                clearScreen();
+                cout << COLOR_WARNING
+                     << "\n  WARNING: Terminal too small!\n"
+                     << "  Required: " << FF_ARENA_WIDTH << " cols x "
+                     << FF_ARENA_HEIGHT << " rows\n"
+                     << "  Current:  " << ws.ws_col << " cols x "
+                     << ws.ws_row << " rows\n\n"
+                     << "  Please resize your terminal window and try again.\n"
+                     << "  On Mac: drag terminal window wider, or\n"
+                     << "  increase font size to at least 100 columns wide.\n"
+                     << COLOR_RESET << "\n";
+                waitForKeypress();
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Intro screen (blocking input, before O_NONBLOCK is set)
     // -------------------------------------------------------------------------
     showIntroScreen(state, playerHp, playerMaxHp);
 
@@ -762,7 +788,14 @@ bool runBossFight(GameState& state) {
     fcntl(STDIN_FILENO, F_SETFL, origFlags | O_NONBLOCK);
 
     // -------------------------------------------------------------------------
-    // 4. Game loop  (one iteration = one tick = FF_TICK_US microseconds)
+    // 5. Clear terminal fully once before loop starts
+    // CURSOR_HOME alone only overwrites existing lines — clearScreen() ensures
+    // the full terminal is blank before the first frame is drawn.
+    // -------------------------------------------------------------------------
+    clearScreen();
+
+    // -------------------------------------------------------------------------
+    // 6. Game loop  (one iteration = one tick = FF_TICK_US microseconds)
     // -------------------------------------------------------------------------
     while (running) {
 
@@ -889,18 +922,18 @@ bool runBossFight(GameState& state) {
     }
 
     // -------------------------------------------------------------------------
-    // 5. Restore blocking input
+    // 7. Restore blocking input
     // -------------------------------------------------------------------------
     fcntl(STDIN_FILENO, F_SETFL, origFlags);
 
     // -------------------------------------------------------------------------
-    // 6. Update shared game state
+    // 8. Update shared game state
     // -------------------------------------------------------------------------
     state.dragonDefeated = won;
     state.phase          = won ? PHASE_VICTORY : PHASE_GAMEOVER;
 
     // -------------------------------------------------------------------------
-    // 7. Post-fight screens (score breakdown → name entry → save)
+    // 9. Post-fight screens (score breakdown → name entry → save)
     // -------------------------------------------------------------------------
     showScoreBreakdown(won, miningSnapshot,
                        p1Hits, p2Hits, p3Hits,
