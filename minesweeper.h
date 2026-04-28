@@ -3,15 +3,17 @@
 
 #include <vector>
 #include <chrono>
+#include "types.h"
 
 class Minesweeper {
 public:
     Minesweeper(int size, int mines);
-    bool playGame();
+    MinigameResult playGame();
 
 private:
     int size;
     int mines;
+    MinigameResult gamestate;
     std::vector<std::vector<bool>> mineGrid;
     std::vector<std::vector<int>> solutionGrid;
     std::vector<std::vector<char>> revealedGrid;
@@ -39,6 +41,6 @@ private:
     void gameOverMessage();
 
 };
-bool runMinesweeper(int gridSize);
+MinigameResult runMinesweeper(int gridSize);
 
 #endif
