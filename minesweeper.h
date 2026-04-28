@@ -41,6 +41,6 @@ private:
     void gameOverMessage();
 
 };
-bool runMinesweeper(int gridSize);
+MinigameResult runMinesweeper(int gridSize);
 
 #endif
