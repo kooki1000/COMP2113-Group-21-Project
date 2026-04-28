@@ -11,15 +11,6 @@ public:
     MinigameResult playGame();
 
 private:
-    int size;
-    int mines;
-    MinigameResult gamestate;
-    std::vector<std::vector<bool>> mineGrid;
-    std::vector<std::vector<int>> solutionGrid;
-    std::vector<std::vector<char>> revealedGrid;
-    bool gameOver;
-    bool win;
-    std::chrono::steady_clock::time_point startTime;
     void initializeGrids(int size);
     void placeMines();
     void fillSolutionGrid();  
