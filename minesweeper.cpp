@@ -5,13 +5,7 @@
 #include <ctime>
 #include <fstream>
 #include <chrono>
-
-enum class MinigameResult {
-  MINIGAME_WIN = 0,
-  MINIGAME_LOSE = 1,
-  MINIGAME_ESCAPE = 2
-};
-
+#include "types.h"
 
 class Minesweeper {
 public:
@@ -19,7 +13,7 @@ public:
     void initializeGrids(int size);
     void displayBoard();
     void clearScreen();
-    bool playGame();
+    MinigameResult playGame();
     void makeMove(char action, int x, int y);
     MinigameResult gameState; //lose, win, or escape
 
