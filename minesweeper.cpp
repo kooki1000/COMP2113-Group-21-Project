@@ -313,7 +313,7 @@ double Minesweeper::getElapsedTime() const {
     std::chrono::duration<double> elapsed = endTime - startTime;
     return elapsed.count()/1000.0;
 }
-bool runMinesweeper(int gridSize){
+MinigameResult runMinesweeper(int gridSize){
     Minesweeper game(gridSize, (gridSize*gridSize)/6);
     return game.playGame();
 }
