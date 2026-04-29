@@ -8,6 +8,7 @@
 class evaluator{
     public:
     double evaluate(const std::string& expression);
+    bool checkNumbersUsed(const std::string expression, std::vector<int> numbers);
     private:
     std::map<char, int> precedence = {
         {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2}
@@ -73,6 +74,23 @@ std::vector<std::string> evaluator::shunting_yard(const std::string& expression)
     }
 
     return output;
+}
+
+//checks if all numbers are used once and at most once 
+bool evaluator::checkNumbersUsed(const std::string expression, std::vector<int> numbers) {
+    std::vector<std::string> rpn = shunting_yard(expression);
+    std::vector<int> usedNumbers;
+    for (const std::string& token : rpn) {
+        if (std::isdigit(token[0])) {
+            usedNumbers.push_back(std::stoi(token));
+        }
+    }
+    if (usedNumbers.size() != numbers.size()) {
+        return false;
+    }
+    std::sort(usedNumbers.begin(), usedNumbers.end());
+    std::sort(numbers.begin(), numbers.end());
+    return usedNumbers == numbers;
 }
 
 double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
