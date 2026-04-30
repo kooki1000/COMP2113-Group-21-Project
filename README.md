@@ -2,10 +2,10 @@
 
 ## Team Members
 
-| Name  | Student ID | Role                              |
-|-------|------------|-----------------------------------|
-| Sohan | 3036636025    | Boss fight, score system          |
-
+| Name | Student ID | Role |
+| :--- | :--- | :--- |
+| Sohan | 3036636025 | Boss fight, score system |
+| Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation|
 ---
 
 ## Features Implemented
@@ -103,3 +103,65 @@ on Linux and require no additional installation:
 | `<ctime>`    | `time()` for high score timestamps           |
 
 Terminal rendering uses ANSI escape codes via the team's `colors.h` 
+
+Got it—since you're working with just the single `.cpp` file for now, I’ve adjusted the description to focus on the implementation logic within that file while keeping the formatting identical to your existing README style.
+
+Copy and paste this section:
+
+---
+
+### Wordle Minigame (`wordle.cpp`)
+
+A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attempts to identify a hidden word, with feedback provided via high-contrast color-coded tiles: **Green** (correct position), **Yellow** (wrong position), and **Gray** (not in word). The game features a live "Letters Used" keyboard tracker that updates in real-time to show the best-known status of each letter in the alphabet.
+
+**How coding elements are met:**
+
+- **Random events (Element 1):** The game utilizes `rand()` to select a target word from three categorized dictionaries (`WORDS_4`, `WORDS_5`, or `WORDS_6`). This ensures the hidden word is different every time the minigame is triggered.
+
+- **Data structures (Element 2):** Uses `std::vector<std::string>` to store categorized word lists and `std::vector<int>` status arrays to track the state of the board and the keyboard. The algorithm handles duplicate letters by tracking character usage in a boolean vector, ensuring yellow/green hints are technically accurate (e.g., not over-counting letters).
+
+- **Multiple files (Element 5):** The module is designed as a standalone component that integrates with the project-wide `colors.h` for ANSI rendering and `menu.h` for screen management. It uses a clean functional interface (`runWordle`) to be called from the main game state.
+
+- **Difficulty levels (Element 6):** Difficulty is mechanically enforced through word length. The `runWordle` function accepts a `wordLength` parameter (4, 5, or 6), which switches the game logic between "Easy," "Normal," and "Hard" modes, respectively, by referencing different pointer-based dictionaries.
+
+---
+
+Here is the updated, copy-pasteable README section for your **Sudoku** and **Wordle** modules, incorporating the technical libraries into the descriptive text to remove the table entirely.
+
+---
+
+### Wordle Minigame (`wordle.cpp`)
+
+An integrated terminal-based logic puzzle where players must identify a hidden word within 5 attempts. The game features a dynamic UI with color-coded feedback: **Green** (correct position), **Yellow** (wrong position), and **Gray** (not in word), alongside a "Letters Used" keyboard tracker to help players narrow down possibilities.
+
+**How coding elements are met:**
+
+- **Random events (Element 1):** The target word is selected randomly from a pool of hundreds of words using `rand()` and `<cstdlib>` functions. This ensures a fresh challenge for each encounter.
+  
+- **Data structures (Element 2):** The game uses `std::vector<std::string>` for the word dictionaries (`WORDS_4`, `WORDS_5`, `WORDS_6`) and a `std::vector<int>` status array to track the state of all 26 letters to render the live keyboard interface.
+
+- **Multiple files (Element 5):** The module integrates seamlessly with `colors.h` for ANSI rendering and uses `<termios.h>` to toggle **ICANON** and **ECHO** modes, allowing for validated terminal input without interfering with the main game's raw input settings.
+
+- **Difficulty levels (Element 6):** The game scales difficulty by varying the word length:
+    - **Easy:** 4-letter words.
+    - **Normal:** 5-letter words.
+    - **Hard:** 6-letter words.
+
+---
+
+### Sudoku Minigame (`sudoku.cpp`)
+
+An advanced logic-based minigame used for unlocking high-tier rewards. The game dynamically generates a solvable Sudoku grid using a recursive backtracking algorithm. It features a custom board-rendering engine that distinguishes between **Fixed Numbers** and **Player Moves** using color-coded ANSI output.
+
+**How coding elements are met:**
+
+- **Random events (Element 1):** Puzzle generation utilizes the `<random>` library’s `std::mt19937` and `std::shuffle` from `<algorithm>` to ensure every board is unique and mathematically valid.
+
+- **Data structures (Element 2):** Board states are managed via a 2D `std::vector<std::vector<int>>`. A parallel boolean grid tracks "fixed" cells to prevent players from overwriting initial clues.
+
+- **Multiple files (Element 5):** Encapsulated within a `SudokuGame` class, the module uses `<sstream>` to parse complex user input strings (`Row Col Value`) and leverages `<unistd.h>` for consistent frame timing across the project.
+
+- **Difficulty levels (Element 6):** Difficulty is scaled through both grid dimensions and clue density:
+    - **Easy/Normal:** 6x6 grid with 2x3 subgrids.
+    - **Hard:** 9x9 grid with 3x3 subgrids.
+    The number of cells removed to create the puzzle is dynamically adjusted based on the player's chosen difficulty level.
