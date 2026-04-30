@@ -10,6 +10,7 @@
 class evaluator{
     public:
     double evaluate(const std::string& expression);
+    bool checkNumbersUsed(const std::string expression, std::vector<int> numbers);
     private:
     bool isOperator(char c);
     std::vector<std::string> shunting_yard(const std::string& expression);
