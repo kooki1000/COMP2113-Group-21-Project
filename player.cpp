@@ -265,82 +265,70 @@ void initiateMining(GameState& state) {
 }
 
 // Resolve mining attempt after minigame completes
-void resolveMiningAttempt(GameState& state, MinigameResult result) {
+void resolveMiningAttempt(GameState& state, bool minigameWon) {
     if (!state.miningPending) {
-        return;
+        return;  // No pending mining operation
     }
 
-    switch (result) {
-        case MINIGAME_WIN: {
-            // Success - grant resources
-            BlockType minedType = state.pendingMineType;
-            int points = 0;
+    if (minigameWon) {
+        // Success - grant resources
+        BlockType minedType = state.pendingMineType;
+        int points = 0;
 
-            switch (minedType) {
-                case BLOCK_WOOD:
-                case BLOCK_LEAVES:
-                    points = 1;
-                    break;
-                case BLOCK_STONE:
-                    points = 2;
-                    break;
-                case BLOCK_COAL:
-                    points = 2;
-                    break;
-                case BLOCK_IRON:
-                    points = 3;
-                    break;
-                case BLOCK_GOLD:
-                    points = 4;
-                    break;
-                case BLOCK_DIAMOND:
-                    points = 5;
-                    break;
-                default:
-                    break;
-            }
-
-            // Mark block as mined
-            int tx = state.pendingMinePos.x;
-            int ty = state.pendingMinePos.y;
-            state.world[ty][tx].mined = true;
-            state.world[ty][tx].type = BLOCK_AIR;
-
-            // Update score
-            if (points > 0) {
-                addScore(state, points);
-                state.oresMined++;
-            }
-
-            state.lastMessage = "Success! Mined " + std::string(1, getBlockChar(minedType)) +
-                                " (+" + std::to_string(points) + " pts)";
-            break;
+        switch (minedType) {
+            case BLOCK_WOOD:
+                state.player.inventory.wood++;
+                points = 1;
+                break;
+            case BLOCK_STONE:
+                state.player.inventory.stone++;
+                points = 2;
+                break;
+            case BLOCK_COAL:
+                state.player.inventory.coal++;
+                points = 2;
+                break;
+            case BLOCK_IRON:
+                state.player.inventory.iron++;
+                points = 3;
+                break;
+            case BLOCK_GOLD:
+                state.player.inventory.gold++;
+                points = 4;
+                break;
+            case BLOCK_DIAMOND:
+                state.player.inventory.diamond++;
+                points = 5;
+                break;
+            default:
+                break;
         }
 
-        case MINIGAME_LOSE: {
-            // Failure - take normal damage
-            int damage = state.settings.minigameDamage;
-            damagePlayer(state, damage);
+        // Mark block as mined
+        int tx = state.pendingMinePos.x;
+        int ty = state.pendingMinePos.y;
+        state.world[ty][tx].mined = true;
+        state.world[ty][tx].type = BLOCK_AIR;
 
-            if (state.player.alive) {
-                state.lastMessage = "Failed! Took " + std::to_string(damage) + " damage! Try again.";
-            } else {
-                state.lastMessage = "Mining accident... you perished!";
-            }
-            break;
+        // Update score and stats.
+        // addScore() (score.h) is the single place that applies scoreMultiplier —
+        // do NOT increment state.score directly anywhere else in this file.
+        if (points > 0) {
+            addScore(state, points);
+            state.oresMined++;
         }
 
-        case MINIGAME_ESCAPE: {
-            // Escape - take double damage
-            int damage = state.settings.minigameDamage * 2;
-            damagePlayer(state, damage);
+        state.lastMessage = "Success! Mined " + std::string(getBlockChar(minedType)) +
+                            " (+" + std::to_string(points) + " pts)";
+    } else {
+        // Failure - take damage
+        int damage = state.settings.minigameDamage;
+        damagePlayer(state, damage);
 
-            if (state.player.alive) {
-                state.lastMessage = "You fled! Took " + std::to_string(damage) + " damage!";
-            } else {
-                state.lastMessage = "Fled but succumbed to injuries...";
-            }
-            break;
+        if (state.player.alive) {
+            state.lastMessage = "Failed! Took " + std::to_string(damage) + " damage! Try again.";
+        } else {
+            state.lastMessage = "Mining accident... you perished!";
         }
     }
 
