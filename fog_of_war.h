@@ -15,6 +15,7 @@
 #ifndef FOG_OF_WAR_H
 #define FOG_OF_WAR_H
 
+#include <string>
 #include "types.h"
 
 // Get the visibility radius for a given world row.
@@ -25,9 +26,10 @@ int getVisibilityRadius(int worldY);
 // Call once per tick or whenever the player moves.
 void updateWorldVisibility(GameState& state);
 
-// Render the entire world viewport into the terminal.
-// Uses buffered output (single write call) to prevent flicker.
-// Calls day_night functions for sky cells.
-void renderWorld(const GameState& state);
+// Render the entire world viewport + HUD into the terminal.
+// Builds world, HUD and status line into one buffer, then does a single
+// write() call — guarantees no tearing or flicker between frames.
+// statusMsg: the last game message to show at the bottom (empty = hide).
+void renderWorld(const GameState& state, const std::string& statusMsg);
 
 #endif
