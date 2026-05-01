@@ -63,7 +63,7 @@ using std::string;
  */
 void addScore(GameState& state, int rawPoints) {
     // Guard: never subtract from score due to a negative rawPoints call
-    if (rawPoints <= 0) return;
+    if (rawPoints < 0) return;
 
     // Apply difficulty multiplier — cast truncates fractional remainder
     state.score += static_cast<int>(rawPoints * state.settings.scoreMultiplier);
