@@ -42,6 +42,9 @@ std::string getPlayerName(const std::string& prompt);
 // Read a single keypress without waiting for Enter
 char getch();
 
+// Set to true by wordle/minesweeper when player quits mid-game (forfeit penalty)
+extern bool g_minigameForfeited;
+
 // ----- ASCII ART -----
 
 // Big fancy title banner
@@ -71,4 +74,4 @@ void showInventory(const GameState& state);
 // Show a status message at bottom of screen
 void showStatusMessage(const std::string& message, bool isError = false);
 
-#endif // MENU_H
+#endif
