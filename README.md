@@ -104,12 +104,6 @@ on Linux and require no additional installation:
 
 Terminal rendering uses ANSI escape codes via the team's `colors.h` 
 
-Got it—since you're working with just the single `.cpp` file for now, I’ve adjusted the description to focus on the implementation logic within that file while keeping the formatting identical to your existing README style.
-
-Copy and paste this section:
-
----
-
 ### Wordle Minigame (`wordle.cpp`)
 
 A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attempts to identify a hidden word, with feedback provided via high-contrast color-coded tiles: **Green** (correct position), **Yellow** (wrong position), and **Gray** (not in word). The game features a live "Letters Used" keyboard tracker that updates in real-time to show the best-known status of each letter in the alphabet.
@@ -123,12 +117,6 @@ A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attem
 - **Multiple files (Element 5):** The module is designed as a standalone component that integrates with the project-wide `colors.h` for ANSI rendering and `menu.h` for screen management. It uses a clean functional interface (`runWordle`) to be called from the main game state.
 
 - **Difficulty levels (Element 6):** Difficulty is mechanically enforced through word length. The `runWordle` function accepts a `wordLength` parameter (4, 5, or 6), which switches the game logic between "Easy," "Normal," and "Hard" modes, respectively, by referencing different pointer-based dictionaries.
-
----
-
-Here is the updated, copy-pasteable README section for your **Sudoku** and **Wordle** modules, incorporating the technical libraries into the descriptive text to remove the table entirely.
-
----
 
 ### Wordle Minigame (`wordle.cpp`)
 
