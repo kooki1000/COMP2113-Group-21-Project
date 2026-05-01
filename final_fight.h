@@ -66,25 +66,22 @@
 // Formula: calcFightHP(difficulty, armor) = baseHP + armorBonus
 // Base HP per difficulty:
 // -----------------------------------------------------------------------------
-#define FF_BASE_HP_EASY     40
-#define FF_BASE_HP_NORMAL   30
-#define FF_BASE_HP_HARD     20
+// Base fight HP (no armor = this, it should hurt)
+#define FF_BASE_HP_EASY     20
+#define FF_BASE_HP_NORMAL   15
+#define FF_BASE_HP_HARD     10
 
-// Flat armor HP bonus added on top of base — same value on all difficulties
-#define FF_HP_BONUS_STONE    8
-#define FF_HP_BONUS_IRON    15
-#define FF_HP_BONUS_GOLD    22
-#define FF_HP_BONUS_DIAMOND 30
+// Armor HP bonuses — armor should feel necessary
+#define FF_HP_BONUS_STONE   15
+#define FF_HP_BONUS_IRON    30
+#define FF_HP_BONUS_GOLD    50
+#define FF_HP_BONUS_DIAMOND 80
 
-// -----------------------------------------------------------------------------
-// Arrow damage to dragon per hit, by MaterialTier (from types.h)
-// MATERIAL_NONE=0, MATERIAL_WOOD=1, MATERIAL_STONE=2 → 1 dmg
-// MATERIAL_IRON=3 → 3, MATERIAL_GOLD=4 → 5, MATERIAL_DIAMOND=5 → 8
-// -----------------------------------------------------------------------------
+// Arrow damage per hit — better armor = bigger payoff
 #define FF_DMG_DEFAULT   1
-#define FF_DMG_IRON      3
-#define FF_DMG_GOLD      5
-#define FF_DMG_DIAMOND   8
+#define FF_DMG_IRON      4
+#define FF_DMG_GOLD      7
+#define FF_DMG_DIAMOND  12
 
 // -----------------------------------------------------------------------------
 // Phase thresholds (% of dragon.maxHp remaining when phase transition triggers)
@@ -123,10 +120,12 @@
  * Built once by initBossConfig() at fight start, never modified during the fight.
  */
 struct BossConfig {
-    int dragonHp;        // dragon starting HP
-    int fireballDmg;     // HP removed from player per fireball hit
-    int fireRateTicks;   // ticks between fireball volleys
-    int dragonSpeed;     // base columns dragon moves per tick
+    int  dragonHp;        // dragon starting HP
+    int  fireballDmg;     // HP removed from player per fireball hit
+    int  fireRateTicks;   // ticks between fireball volleys
+    int  dragonSpeed;     // base columns dragon moves per tick
+    bool hasEnrage;       // hard: speed + rate boost when HP drops to 50%
+    int  spread3;         // phase-3 fireball outer spread (wider on hard)
 };
 
 /*
@@ -137,13 +136,11 @@ struct BossConfig {
  * y is always FF_DRAGON_TOP_ROW.
  */
 struct Dragon {
-    int x;           // column of the block's left edge
-    int y;           // row of the block's top edge (fixed = FF_DRAGON_TOP_ROW)
-    int hp;          // current HP
-    int maxHp;       // starting HP, used for phase threshold checks
-    int speed;       // columns moved per tick (increases at phase transitions)
-    int direction;   // +1 = moving right, -1 = moving left
-    int phase;       // current phase: FF_PHASE1, FF_PHASE2, or FF_PHASE3
+    int  x, y;
+    int  hp, maxHp;
+    int  speed, direction, phase;
+    bool enraged;       // hard: triggers at 50% HP — speed + fire rate boost
+    int  announceTicks; // ticks left to flash a phase-change / enrage banner
 };
 
 /*
