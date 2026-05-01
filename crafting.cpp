@@ -351,18 +351,21 @@ void openCraftingMenu(GameState& state) {
                 if (canCraft(state, RECIPES[selected])) {
                     bool minigameTriggered = performCrafting(state, RECIPES[selected]);
                     if (minigameTriggered) {
+                        // Minigame was triggered, exit menu immediately
+                        // Main loop will detect state.minigameActive and state.phase
                         return;
                     }
-                    usleep(500000);
+                    // Small delay to show success message
+                    usleep(500000);  // 500ms
                 } else {
-                    std::cout << "\a";
+                    // Error flash
+                    std::cout << "\a";  // Bell
                 }
-
                 break;
 
             case 'q':
             case 'Q':
-                return;
+                return;  // Exit to game
         }
     }
 }
