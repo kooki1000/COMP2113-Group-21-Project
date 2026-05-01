@@ -1,5 +1,6 @@
 /*
  * main.cpp
+ * TermiCraft — entry point and game loop
  */
 
 #include <algorithm>
@@ -11,361 +12,675 @@
 #include <sstream>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "colors.h"
+#include "day_night.h"
 #include "fileio.h"
 #include "final_fight.h"
 #include "fog_of_war.h"
 #include "menu.h"
 #include "minesweeper.h"
 #include "player.h"
+#include "score.h"
 #include "types.h"
 #include "world_gen.h"
 
-// ----- FORWARD DECLARATIONS -----
-
-// Mohit - world generation and rendering
-void initWorld(GameState &state);
-void generateWorld(GameState &state);
-void renderWorld(const GameState &state);
-void updateWorldVisibility(GameState &state);
-
-// Koki - player movement, mining, crafting
-void initPlayer(GameState &state);
-void handlePlayerInput(GameState &state, char input);
-void resolveMiningAttempt(GameState &state, bool minigameWon);
-
-// Sohan - boss fight
-bool runBossFight(GameState &state);
-
-// Aryan & Nan - minigames
+// wordle.cpp exports this free function
 bool runWordle(int wordLength);
-bool runMinesweeper(int gridSize);
-bool runSudoku(Difficulty diff);
 
 // ----- GLOBALS -----
 
 static GameState gameState;
-static bool gameRunning = true;
+static bool      gameRunning = true;
 static struct termios originalTermios;
-static bool terminalStateCaptured = false;
+static volatile sig_atomic_t termResized = 0;
 
-// Random number generator - way better than rand()
-static std::mt19937 rng;
+// ----- FORWARD DECLARATIONS -----
+
+void setupTerminal();
+void restoreTerminal();
+
+// ----- DRAGON CAVE SEQUENCE -----
+// Shows a clean centered popup and runs the boss fight.
+// Returns true if game ended (win or lose), false if player declined.
+static bool runDragonCaveSequence(GameState& state) {
+    state.dragonCaveFound = true;
+    restoreTerminal();
+
+    // Box: dynamic width based on terminal size
+    int termWdc, termHdc;
+    getTermSize(termWdc, termHdc);
+    int BW = std::max(50, std::min(termWdc - 6, 88));
+    clearAndCenterV(16);
+    std::string P = hpad(BW + 2);
+
+    // Center content string within BW columns
+    auto bline = [&](const std::string& s) {
+        // Strip leading spaces so we can re-center cleanly
+        std::string content = s;
+        size_t first = content.find_first_not_of(' ');
+        if (first != std::string::npos) content = content.substr(first);
+        int len = (int)content.size();
+        if (len >= BW) { content = content.substr(0, BW); len = BW; }
+        int leftPad  = (BW - len) / 2;
+        int rightPad = BW - len - leftPad;
+        std::cout << P << "\xe2\x95\x91"
+                  << std::string(leftPad, ' ') << content << std::string(rightPad, ' ')
+                  << "\xe2\x95\x91\n";
+    };
+    auto sep = [&]() {
+        std::cout << P << "\xe2\x95\xa0";
+        for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
+        std::cout << "\xe2\x95\xa3\n";
+    };
+
+    // Top border  ╔══...══╗
+    std::cout << P << "\xe2\x95\x94";
+    for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
+    std::cout << "\xe2\x95\x97\n";
+
+    // Title row: "~  D R A G O N ' S   L A I R  ~" = 32 display cols, centered in BW
+    {
+        int tl = (BW - 32) / 2;
+        int tr = BW - 32 - tl;
+        std::cout << P << "\xe2\x95\x91\033[1;31m"
+                  << std::string(tl, ' ')
+                  << "~  D R A G O N ' S   L A I R  ~"
+                  << std::string(tr, ' ')
+                  << "\033[0m\xe2\x95\x91\n";
+    }
+
+    sep();
+
+    bline("");
+    bline("  You broke through. The air burns. Something stirs.");
+    bline("  Two eyes open in the dark. The ground trembles.");
+    bline("");
+
+    sep();
+
+    // Stats line
+    const char* modeName = (state.difficulty == DIFF_EASY)   ? "Easy"   :
+                           (state.difficulty == DIFF_HARD)   ? "Hard"   : "Normal";
+    char statBuf[80];
+    std::snprintf(statBuf, sizeof(statBuf),
+        "  HP: %d/%d    Armor: %-8s  Mode: %s",
+        state.player.health, state.player.maxHealth,
+        getMaterialName(state.player.equipment.armor).c_str(),
+        modeName);
+    bline(statBuf);
+
+    sep();
+
+    // Warning line — color and message vary by armor tier
+    const char* warnColor;
+    const char* warnMsg;
+    switch (state.player.equipment.armor) {
+        case MATERIAL_NONE:
+        case MATERIAL_WOOD:
+            warnColor = "\033[1;31m";
+            warnMsg   = "NO ARMOR. YOU WILL NOT LAST LONG. GOOD LUCK SURVIVING.";  break;
+        case MATERIAL_STONE:
+            warnColor = "\033[1;31m";
+            warnMsg   = "LIGHT ARMOR. EXPECT HEAVY DAMAGE. GOOD LUCK SURVIVING."; break;
+        case MATERIAL_IRON:
+            warnColor = "\033[38;5;208m";
+            warnMsg   = "IRON ARMOR. RISKY BUT POSSIBLE. GOOD LUCK SURVIVING.";   break;
+        case MATERIAL_GOLD:
+            warnColor = "\033[1;33m";
+            warnMsg   = "GOLD ARMOR. DECENT PROTECTION. GOOD LUCK SURVIVING.";    break;
+        default:  // DIAMOND
+            warnColor = "\033[1;32m";
+            warnMsg   = "DIAMOND ARMOR. YOU ARE PREPARED. GOOD LUCK SURVIVING.";  break;
+    }
+    {
+        int warnLen  = (int)std::strlen(warnMsg);
+        int warnLeft = (BW - std::min(warnLen, BW)) / 2;
+        int warnRight = BW - std::min(warnLen, BW) - warnLeft;
+        std::cout << P << "\xe2\x95\x91"
+                  << std::string(warnLeft, ' ')
+                  << warnColor << warnMsg << "\033[0m"
+                  << std::string(warnRight, ' ')
+                  << "\xe2\x95\x91\n";
+    }
+
+    sep();
+
+    bline("");
+    bline("    Descend into the lair?    [ Y ] Yes   [ N ] No");
+    bline("");
+
+    // Bottom border  ╚══...══╝
+    std::cout << P << "\xe2\x95\x9a";
+    for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
+    std::cout << "\xe2\x95\x9d\n";
+    std::cout.flush();
+
+    char choice = '\0';
+    while (choice != 'y' && choice != 'Y' && choice != 'n' && choice != 'N')
+        read(STDIN_FILENO, &choice, 1);
+
+    if (choice == 'n' || choice == 'N') {
+        setupTerminal();
+        return false;
+    }
+
+    bool bossWon = runBossFight(state);
+    if (bossWon) {
+        state.victory        = true;
+        state.dragonDefeated = true;
+        state.phase          = PHASE_VICTORY;
+    } else {
+        state.gameOver = true;
+        state.phase    = PHASE_GAMEOVER;
+    }
+    return true;
+}
+
+// ----- TERMINAL SIZE -----
+
+static void updateViewportSize(GameState& state) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0) {
+        // Reserve 5 rows: 2 always-on HUD lines + 1 alert (conditional)
+        // + 1 status line + 1 buffer so content never scrolls.
+        state.viewportWidth  = (int)ws.ws_col;
+        state.viewportHeight = (int)ws.ws_row - 5;
+        // Cap width to world width so wide terminals don't show garbage columns.
+        if (state.viewportWidth  > WORLD_WIDTH)  state.viewportWidth  = WORLD_WIDTH;
+        if (state.viewportWidth  < 40) state.viewportWidth  = 40;
+        if (state.viewportHeight < 10) state.viewportHeight = 10;
+    }
+}
+
+static void sigwinchHandler(int) { termResized = 1; }
 
 // ----- TERMINAL SETUP -----
 
 void setupTerminal() {
-  if (!terminalStateCaptured) {
-    // Save current terminal settings once so we always restore true original
-    // state
     tcgetattr(STDIN_FILENO, &originalTermios);
-    terminalStateCaptured = true;
-  }
-
-  // Raw mode - get keypresses immediately without waiting for Enter
-  struct termios raw = originalTermios;
-  raw.c_lflag &= ~(ICANON | ECHO);
-  tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-
-  // Hide the cursor
-  std::cout << CURSOR_HIDE;
-
-  clearScreen();
+    struct termios raw = originalTermios;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    signal(SIGWINCH, sigwinchHandler);
+    std::cout << CURSOR_HIDE;
+    clearScreen();
 }
 
 void restoreTerminal() {
-  if (terminalStateCaptured) {
-    // Put everything back the way it was
     tcsetattr(STDIN_FILENO, TCSANOW, &originalTermios);
-  }
-  std::cout << CURSOR_SHOW;
-  std::cout << COLOR_RESET;
-  clearScreen();
+    std::cout << CURSOR_SHOW;
+    std::cout << COLOR_RESET;
+    clearScreen();
 }
 
 void signalHandler(int signal) {
-  // Clean exit on Ctrl+C
-  restoreTerminal();
-  exit(signal);
+    restoreTerminal();
+    exit(signal);
 }
 
-// ----- COMPAT BRIDGES -----
-void initPlayer(GameState &state) {
-  const std::string playerName =
-      state.player.name.empty() ? "Player" : state.player.name;
-  initPlayer(state, playerName);
-}
+// ----- ENEMY SYSTEM -----
 
-void handlePlayerInput(GameState &state, char input) {
-  handleInput(state, input);
-}
+static void updateEnemies(GameState& state) {
+    if (state.enemies.empty()) return;
 
-// ----- TEMP STUBS FOR YET-TO-BE-FINALIZED MODULES -----
+    int px = state.player.pos.x;
+    int py = state.player.pos.y;
 
-static bool runPendingMinigame(GameState &state) {
-  switch (state.currentMinigame) {
-  case MINIGAME_WORDLE:
-    return runWordle(state.settings.wordleWordLength);
-  case MINIGAME_MINESWEEPER:
-    return runMinesweeper(state.settings.minesweeperSize);
-  default:
-    return false;
-  }
+    for (Enemy& e : state.enemies) {
+        if (!e.alive) continue;
+
+        // Move one step toward player (Manhattan)
+        int dx = 0, dy = 0;
+        if (e.pos.x < px)      dx =  1;
+        else if (e.pos.x > px) dx = -1;
+        if (e.pos.y < py)      dy =  1;
+        else if (e.pos.y > py) dy = -1;
+
+        int nx = e.pos.x + dx;
+        int ny = e.pos.y + dy;
+
+        bool canMove = (nx >= 0 && nx < state.worldWidth &&
+                        ny >= 0 && ny < state.worldHeight);
+        if (canMove) {
+            Block& b = state.world[ny][nx];
+            if (!isSolidBlock(b.type) || b.mined) {
+                e.pos.x = nx;
+                e.pos.y = ny;
+            }
+        }
+
+        // Attack player on contact
+        if (e.pos.x == px && e.pos.y == py) {
+            damagePlayer(state, e.damage);
+            e.alive = false; // enemy dies on contact
+        }
+    }
+
+    // Remove dead enemies
+    state.enemies.erase(
+        std::remove_if(state.enemies.begin(), state.enemies.end(),
+                       [](const Enemy& e) { return !e.alive; }),
+        state.enemies.end());
 }
 
 // ----- GAME INIT/CLEANUP -----
 
-void initGame(GameState &state, Difficulty difficulty, bool isNewGame) {
-  state.difficulty = difficulty;
-  state.settings = getDifficultySettings(difficulty);
-  state.phase = PHASE_PLAYING;
-  state.gameOver = false;
-  state.victory = false;
-  state.score = 0;
-  state.oresMined = 0;
-  state.dragonDefeated = false;
-  state.minigameActive = false;
+void initGame(GameState& state, Difficulty difficulty, bool isNewGame,
+              const std::string& playerName = "") {
+    state.difficulty    = difficulty;
+    state.settings      = getDifficultySettings(difficulty);
+    state.phase         = PHASE_PLAYING;
+    state.gameOver      = false;
+    state.victory       = false;
+    state.score         = 0;
+    state.oresMined     = 0;
+    state.enemiesKilled = 0;
+    state.dragonCaveFound  = false;
+    state.dragonDefeated   = false;
+    state.minigameActive   = false;
+    state.miningPending    = false;
+    state.minigameDamage   = state.settings.minigameDamage;
+    state.enemies.clear();
+    state.activeEvent      = RandomEvent();
+    state.eventCooldown    = 300;  // first event can't fire for 300 frames
+    state.oreSurgeActive   = false;
 
-  if (isNewGame) {
-    state.seed = static_cast<unsigned int>(time(nullptr));
-    initWorld(state);
-    generateWorld(state);
-    initPlayer(state);
-  }
+    updateViewportSize(state);
 
-  updateWorldVisibility(state);
+    if (isNewGame) {
+        state.seed = static_cast<unsigned int>(time(nullptr));
+        initWorld(state);
+        generateWorld(state);
+        initPlayer(state, playerName);
+    }
+
+    updateWorldVisibility(state);
 }
 
-void cleanupGame(GameState &state) {
-  // Free the world array
-  if (state.world != nullptr) {
-    for (int y = 0; y < state.worldHeight; y++) {
-      delete[] state.world[y];
+void cleanupGame(GameState& state) {
+    if (state.world != nullptr) {
+        for (int y = 0; y < state.worldHeight; y++)
+            delete[] state.world[y];
+        delete[] state.world;
+        state.world = nullptr;
     }
-    delete[] state.world;
-    state.world = nullptr;
-  }
+    state.enemies.clear();
+}
+
+// ----- PAUSE MENU -----
+
+static void runPauseMenu() {
+    int termW, termH;
+    getTermSize(termW, termH);
+    int BW = std::max(35, std::min(termW - 6, 68));
+    clearAndCenterV(13);
+    std::string P = hpad(BW + 2);
+
+    auto pline = [&](const char* textColor, const char* s) {
+        std::string c(s);
+        if ((int)c.size() > BW) c = c.substr(0, BW);
+        else c += std::string(BW - c.size(), ' ');
+        std::cout << COLOR_CYAN << P << "\xe2\x95\x91" << textColor << c << COLOR_CYAN << "\xe2\x95\x91\n";
+    };
+    auto topBar = [&]() { std::cout << COLOR_BOLD_CYAN << P << "\xe2\x95\x94"; for (int i=0;i<BW;i++) std::cout << "\xe2\x95\x90"; std::cout << "\xe2\x95\x97\n"; };
+    auto midBar = [&]() { std::cout << COLOR_CYAN     << P << "\xe2\x95\xa0"; for (int i=0;i<BW;i++) std::cout << "\xe2\x95\x90"; std::cout << "\xe2\x95\xa3\n"; };
+    auto botBar = [&]() { std::cout << COLOR_CYAN     << P << "\xe2\x95\x9a"; for (int i=0;i<BW;i++) std::cout << "\xe2\x95\x90"; std::cout << "\xe2\x95\x9d\n" << COLOR_RESET; };
+
+    // Title: "⏸  PAUSED" = 9 display cols (⏸ = U+23F8, display width 1)
+    int titleLeft = (BW - 9) / 2;
+    int titleRight = BW - 9 - titleLeft;
+
+    topBar();
+    std::cout << COLOR_BOLD_CYAN << P << "\xe2\x95\x91"
+              << std::string(titleLeft, ' ') << "\xe2\x8f\xb8  PAUSED" << std::string(titleRight, ' ')
+              << "\xe2\x95\x91\n";
+    midBar();
+
+    char hpBuf[96], depBuf[96];
+    std::snprintf(hpBuf,  sizeof(hpBuf),  "  HP: %d/%d   Score: %d",
+                  gameState.player.health, gameState.player.maxHealth, gameState.score);
+    std::snprintf(depBuf, sizeof(depBuf), "  Depth: %d   Pos: (%d,%d)",
+                  gameState.player.pos.y - SURFACE_LEVEL,
+                  gameState.player.pos.x, gameState.player.pos.y);
+    pline(COLOR_WHITE, hpBuf);
+    pline(COLOR_WHITE, depBuf);
+    midBar();
+    pline(COLOR_WHITE, "  [S] Save Game");
+    pline(COLOR_WHITE, "  [R] Resume");
+    pline(COLOR_WHITE, "  [Q] Quit to Menu");
+    midBar();
+    pline(COLOR_DIM, "  WASD=move  SPACE=mine  C=craft");
+    pline(COLOR_DIM, "  I=inventory  P=pause  Q=quit");
+    botBar();
+
+    char pauseInput;
+    if (read(STDIN_FILENO, &pauseInput, 1) == 1) {
+        if (pauseInput == 's' || pauseInput == 'S') {
+            restoreTerminal();
+            if (saveGame(gameState)) {
+                std::cout << "\n    " << COLOR_SUCCESS << "Game saved!\n" << COLOR_RESET;
+            } else {
+                std::cout << "\n    " << COLOR_DANGER << "Save failed!\n" << COLOR_RESET;
+            }
+            waitForKeypress();
+            setupTerminal();
+        } else if (pauseInput == 'q' || pauseInput == 'Q') {
+            gameRunning = false;
+        }
+        // 'R' or anything else: just resume
+    }
 }
 
 // ----- GAME LOOP -----
 
 void runGameLoop() {
-  while (gameRunning && !gameState.gameOver && !gameState.victory) {
+    while (gameRunning && !gameState.gameOver && !gameState.victory) {
 
-    /* minigame trigger when everyone completes their part #DONT TOUCH */
-    if (gameState.phase == PHASE_MINIGAME && gameState.minigameActive) {
-      restoreTerminal();
-      bool minigameWon = runPendingMinigame(gameState);
-      setupTerminal();
+        // ── Minigame phase ────────────────────────────────────────────────────
+        if (gameState.phase == PHASE_MINIGAME && gameState.miningPending) {
+            restoreTerminal();
 
-      if (gameState.miningPending) {
-        resolveMiningAttempt(gameState, minigameWon);
-      } else {
-        if (minigameWon) {
-          confirmUpgrade(gameState);
-        } else {
-          gameState.minigameActive = false;
-          gameState.currentMinigame = MINIGAME_NONE;
-          gameState.pendingUpgrade = MATERIAL_NONE;
-          gameState.lastMessage = "upgrade challenge failed.";
-        }
-      }
+            g_minigameForfeited = false;
+            bool won = false;
+            if (gameState.currentMinigame == MINIGAME_WORDLE)
+                won = runWordle(gameState.settings.wordleWordLength);
+            else
+                won = runMinesweeper(gameState.settings.minesweeperSize);
 
-      gameState.phase = gameState.player.alive ? PHASE_PLAYING : PHASE_GAMEOVER;
-      if (!gameState.player.alive) {
-        gameState.gameOver = true;
-      }
-      continue;
-    }
+            if (g_minigameForfeited) {
+                // Player fled mid-challenge — double penalty, cancel any pending upgrade
+                int penalty = gameState.settings.minigameDamage * 2;
+                damagePlayer(gameState, penalty);
+                gameState.lastMessage = "COWARD! Fled the challenge! Took "
+                    + std::to_string(penalty) + " damage!";
+                gameState.pendingUpgrade = MATERIAL_NONE;
+                gameState.phase          = PHASE_PLAYING;
+                gameState.miningPending  = false;
+                gameState.minigameActive = false;
+                setupTerminal();
+                continue;
+            }
 
-    // final fight trigger #DONT TOUCH
-    if (gameState.phase == PHASE_BOSS) {
-      restoreTerminal();
-      bool bossWon = runBossFight(gameState);
-      setupTerminal();
+            bool wasCraftingTrial = (gameState.pendingUpgrade != MATERIAL_NONE);
 
-      gameState.phase = bossWon ? PHASE_VICTORY : PHASE_GAMEOVER;
-      if (!bossWon) {
-        gameState.gameOver = true;
-      } else {
-        gameState.victory = true;
-      }
-      continue;
-    }
-    if (gameState.phase == PHASE_MENU) {
-      gameRunning = false;
-      break;
-    }
-
-    updateWorldVisibility(gameState);
-
-    // Draw the world
-    renderWorld(gameState);
-
-    // Get input (blocking - game is turn-based)
-    char input;
-    if (read(STDIN_FILENO, &input, 1) == 1) {
-      switch (input) {
-      case 'q':
-      case 'Q':
-        if (showConfirmation("Quit to menu?")) {
-          gameRunning = false;
-        }
-        break;
-      case 'p':
-      case 'P':
-        // Pause menu
-        clearScreen();
-        std::cout << "\n\n    PAUSED\n\n";
-        std::cout << "    [S] Save Game\n";
-        std::cout << "    [R] Resume\n";
-        std::cout << "    [Q] Quit to Menu\n\n";
-
-        char pauseInput;
-        if (read(STDIN_FILENO, &pauseInput, 1) == 1) {
-          if (pauseInput == 's' || pauseInput == 'S') {
-            if (saveGame(gameState)) {
-              std::cout << "    Game saved!\n";
+            if (wasCraftingTrial) {
+                // Crafting "rite of passage" minigame
+                if (won) {
+                    confirmUpgrade(gameState);
+                } else {
+                    // Failed rite — strip the just-crafted equipment back one tier
+                    MaterialTier stripped = static_cast<MaterialTier>(
+                        static_cast<int>(gameState.pendingUpgrade) - 1);
+                    gameState.player.equipment.pickaxe = stripped;
+                    damagePlayer(gameState, gameState.settings.minigameDamage);
+                    gameState.lastMessage = "Trial failed! Lost the " +
+                        getMaterialName(gameState.pendingUpgrade) +
+                        " equipment. Took " +
+                        std::to_string(gameState.settings.minigameDamage) + " damage!";
+                    gameState.pendingUpgrade = MATERIAL_NONE;
+                }
             } else {
-              std::cout << "    Failed to save!\n";
-            }
-            waitForKeypress();
-          } else if (pauseInput == 'q' || pauseInput == 'Q') {
-            gameRunning = false;
-          }
-        }
-        break;
-      case ' ': {
-        int tx = gameState.player.pos.x + gameState.player.facingX;
-        int ty = gameState.player.pos.y + gameState.player.facingY;
-        if (tx >= 0 && tx < gameState.worldWidth && ty >= 0 &&
-            ty < gameState.worldHeight) {
-          if (gameState.world[ty][tx].type == BLOCK_DRAGON_CAVE) {
-            bool enter = true;
-            if (gameState.player.equipment.armor < MATERIAL_DIAMOND) {
-              enter = showConfirmation(
-                  "WARNING: Low armor! Enter Dragon Cave anyway?");
-            } else {
-              enter = showConfirmation("Enter the Dragon Cave?");
+                // Normal mining minigame
+                BlockType minedType = gameState.pendingMineType;
+                Position  minedPos  = gameState.pendingMinePos;
+                resolveMiningAttempt(gameState, won);
+                if (won) {
+                    trySpawnEnemy(gameState, minedPos);
+
+                    // Dragon cave: only enters after successfully mining the cave block
+                    if (minedType == BLOCK_DRAGON_CAVE && !gameState.dragonDefeated) {
+                        gameState.phase          = PHASE_PLAYING;
+                        gameState.miningPending  = false;
+                        gameState.minigameActive = false;
+                        setupTerminal();
+                        bool gameEnded = runDragonCaveSequence(gameState);
+                        if (gameEnded) break;   // go to victory/gameover handling
+                        continue;
+                    }
+                }
             }
 
-            if (enter) {
-              gameState.phase = PHASE_BOSS;
+            gameState.phase          = PHASE_PLAYING;
+            gameState.miningPending  = false;
+            gameState.minigameActive = false;
+            setupTerminal();
+            continue;
+        }
+
+        if (gameState.gameOver || gameState.victory) break;
+
+        // ── Terminal resize ───────────────────────────────────────────────────
+        if (termResized) {
+            termResized = 0;
+            updateViewportSize(gameState);
+            updateCamera(gameState);
+            clearScreen();
+        }
+
+        // ── Random event tick ─────────────────────────────────────────────────
+        {
+            RandomEvent& ev = gameState.activeEvent;
+            if (ev.active) {
+                ev.ticksLeft--;
+                if (ev.ticksLeft <= 0) {
+                    ev.active = false;
+                    gameState.oreSurgeActive = false;
+                    gameState.eventCooldown  = 400;
+                    gameState.lastMessage    = "Event over.";
+                }
+                // Red zone: slow-burn damage — only ticks every damagePeriod frames
+                if (ev.type == EVENT_RED_ZONE && ev.active) {
+                    if (ev.alertTicks > 0) ev.alertTicks--;
+                    ev.damageTimer++;
+                    if (ev.damageTimer >= ev.damagePeriod) {
+                        ev.damageTimer = 0;
+                        int dx = std::abs(gameState.player.pos.x - ev.x);
+                        int dy = std::abs(gameState.player.pos.y - ev.y);
+                        if (dx + dy <= ev.radius) {
+                            damagePlayer(gameState, ev.damage);
+                            gameState.lastMessage = "BURNING! -" + std::to_string(ev.damage) + " HP";
+                        }
+                    }
+                }
+            } else {
+                if (gameState.eventCooldown > 0) {
+                    gameState.eventCooldown--;
+                } else {
+                    // 2% chance per frame to spawn a new event
+                    if ((rand() % 100) < 2) {
+                        int kind = rand() % 2;
+                        ev.active    = true;
+                        ev.ticksLeft = 180 + rand() % 120;  // 180-300 frames (~6-10s)
+                        // Centre the event near the player but offset so they can react
+                        int offX = (rand() % 15) - 7;
+                        int offY = (rand() % 7)  - 3;
+                        ev.x = std::max(0, std::min(gameState.worldWidth  - 1, gameState.player.pos.x + offX));
+                        ev.y = std::max(0, std::min(gameState.worldHeight - 1, gameState.player.pos.y + offY));
+                        if (kind == 0) {
+                            ev.type   = EVENT_RED_ZONE;
+                            ev.radius = (gameState.difficulty == DIFF_EASY)   ? 4 + rand() % 3 :
+                                        (gameState.difficulty == DIFF_HARD)   ? 8 + rand() % 5 :
+                                                                                 6 + rand() % 4;
+                            ev.damage = (gameState.difficulty == DIFF_EASY)   ? 3 :
+                                        (gameState.difficulty == DIFF_HARD)   ? 8 : 5;
+                            ev.damagePeriod = (gameState.difficulty == DIFF_EASY)  ? 60 :
+                                              (gameState.difficulty == DIFF_HARD)  ? 20 : 40;
+                            ev.damageTimer = 0;
+                            ev.alertTicks  = 90;  // 3 seconds of big alert banner
+                            ev.ticksLeft   = (gameState.difficulty == DIFF_EASY)  ? 300 :
+                                             (gameState.difficulty == DIFF_HARD)  ? 600 : 450;
+                            gameState.lastMessage = "!!! DANGER: FIRE ZONE — GET OUT NOW !!!";
+                        } else {
+                            ev.type   = EVENT_ORE_SURGE;
+                            ev.radius = 8;
+                            ev.damage = 0;
+                            gameState.oreSurgeActive = true;
+                            gameState.lastMessage = "ORE SURGE — Mining doubled!";
+                        }
+                        gameState.eventCooldown = 500;
+                    }
+                }
             }
+        }
+
+        if (gameState.gameOver) break;
+
+        // ── Render ────────────────────────────────────────────────────────────
+        tickDayCycle();
+        updateWorldVisibility(gameState);
+        // World + HUD + status are all written in one atomic write — no flicker.
+        renderWorld(gameState, gameState.lastMessage);
+
+        // ── Update enemies ────────────────────────────────────────────────────
+        updateEnemies(gameState);
+
+        if (gameState.gameOver) break;
+
+        // ── Input ─────────────────────────────────────────────────────────────
+        char input;
+        if (read(STDIN_FILENO, &input, 1) != 1) continue;
+
+        switch (input) {
+        case 'q':
+        case 'Q':
+            if (showConfirmation("Quit to menu?"))
+                gameRunning = false;
             break;
-          }
+        case 'p':
+        case 'P':
+            runPauseMenu();
+            break;
+        default:
+            handleInput(gameState, input);
+            break;
         }
-        handlePlayerInput(gameState, input);
-        break;
-      }
-      default:
-        handlePlayerInput(gameState, input);
-        break;
-      }
     }
-
-    updatePhysics(gameState);
-  }
 }
 
 // ----- MAIN -----
 
 int main() {
-  // Set up signal handlers so Ctrl+C doesn't brick the terminal
-  signal(SIGINT, signalHandler);
-  signal(SIGTERM, signalHandler);
+    signal(SIGINT,  signalHandler);
+    signal(SIGTERM, signalHandler);
 
-  // Seed random (we'll re-seed with game seed later)
-  rng.seed(static_cast<unsigned int>(time(nullptr)));
+    srand(static_cast<unsigned int>(time(nullptr)));
 
-  bool exitGame = false;
-  setupTerminal();
+    bool exitGame = false;
 
-  while (!exitGame) {
-    HighScore topScore = getTopHighScore();
-    int choice = showMainMenu(topScore);
+    while (!exitGame) {
+        setupTerminal();
 
-    switch (choice) {
-    case 1: { // New Game
-      Difficulty diff = selectDifficulty();
+        HighScore topScore = getTopHighScore();
+        int choice = showMainMenu(topScore);
 
-      // Get player name (need normal terminal mode for this)
-      restoreTerminal();
-      std::string name = getPlayerName("Enter your name");
-      setupTerminal();
+        switch (choice) {
 
-      gameState.player.name = name;
-      initGame(gameState, diff, true);
+        case 1: { // New Game
+            Difficulty diff = selectDifficulty();
 
-      gameRunning = true;
-      runGameLoop();
+            restoreTerminal();
+            std::string name = getPlayerName("Enter your name");
+            setupTerminal();
 
-      // Game ended
-      if (gameState.gameOver || gameState.victory) {
-        // NOTE: score multiplier handled per-block in Koki's player.cpp
-        // gameState.score = static_cast<int>(gameState.score *
-        // gameState.settings.scoreMultiplier);
+            initGame(gameState, diff, true, name);
 
-        showGameOver(gameState, gameState.victory);
+            gameRunning = true;
+            runGameLoop();
 
-        // show high score (sohan score.cpp)
-      }
+            if (gameState.gameOver || gameState.victory) {
+                restoreTerminal();
+                // Brief pause so death/win doesn't feel instant
+                clearScreen();
+                if (gameState.victory) {
+                    std::cout << "\n\n\033[1;32m"
+                        "                    ══════════════════════════════\n"
+                        "                          DRAGON SLAIN!  🐉\n"
+                        "                    ══════════════════════════════\n"
+                        "\033[0m\n"
+                        "\033[38;5;220m                    Calculating score...\033[0m\n";
+                } else {
+                    std::cout << "\n\n\033[1;31m"
+                        "                    ══════════════════════════════\n"
+                        "                           YOU DIED  💀\n"
+                        "                    ══════════════════════════════\n"
+                        "\033[0m\n"
+                        "\033[38;5;240m                    " << gameState.lastMessage << "\033[0m\n";
+                }
+                std::cout.flush();
+                usleep(1800000);  // 1.8 seconds
+                // Save score during the splash pause — no separate "saving" screen
+                saveFinalScore(gameState, gameState.victory);
+                showGameOver(gameState, gameState.victory);
+                std::vector<HighScore> scores = loadHighScores();
+                showHighScores(scores);
+                setupTerminal();
+            }
 
-      cleanupGame(gameState);
-      break;
-    }
-
-    case 2: { // Load Game
-      if (!saveFileExists()) {
-        clearScreen();
-        std::cout << "\n\n    No save file found!\n";
-        waitForKeypress();
-      } else {
-        if (loadGame(gameState)) {
-          gameRunning = true;
-          runGameLoop();
-
-          if (gameState.gameOver || gameState.victory) {
-            // NOTE: score multiplier handled per-block in Koki's player.cpp
-            // gameState.score = static_cast<int>(gameState.score *
-            // gameState.settings.scoreMultiplier);
-            showGameOver(gameState, gameState.victory);
-
-            // show score by sohans file
-          }
-
-          cleanupGame(gameState);
-        } else {
-          clearScreen();
-          std::cout << "\n\n    Failed to load save file!\n";
-          waitForKeypress();
+            cleanupGame(gameState);
+            break;
         }
-      }
-      break;
-    }
 
-    case 3: { // High Scores
-      std::vector<HighScore> scores = loadHighScores();
-      showHighScores(scores);
-      break;
-    }
+        case 2: { // Load Game
+            if (!saveFileExists()) {
+                clearScreen();
+                std::cout << "\n\n  " << COLOR_WARNING << "No save file found!\n" << COLOR_RESET;
+                waitForKeypress();
+            } else {
+                if (loadGame(gameState)) {
+                    // Re-apply any post-load setup
+                    updateWorldVisibility(gameState);
+                    gameState.phase          = PHASE_PLAYING;
+                    gameState.gameOver       = false;
+                    gameState.victory        = false;
+                    gameState.miningPending  = false;
+                    gameState.minigameActive = false;
+                    gameState.currentMinigame = MINIGAME_NONE;
+                    gameState.pendingUpgrade  = MATERIAL_NONE;
 
-    case 4: { // How to Play
-      showHowToPlay();
-      break;
-    }
+                    gameRunning = true;
+                    runGameLoop();
 
-    case 5: { // Quit
-      exitGame = true;
-      break;
-    }
-    }
-  }
+                    if (gameState.gameOver || gameState.victory) {
+                        restoreTerminal();
+                        showGameOver(gameState, gameState.victory);
+                        saveFinalScore(gameState, gameState.victory);
+                        std::vector<HighScore> scores = loadHighScores();
+                        showHighScores(scores);
+                        setupTerminal();
+                    }
 
-  restoreTerminal();
+                    cleanupGame(gameState);
+                } else {
+                    clearScreen();
+                    std::cout << "\n\n  " << COLOR_DANGER << "Failed to load save file!\n" << COLOR_RESET;
+                    waitForKeypress();
+                }
+            }
+            break;
+        }
 
-  std::cout << "\n  Thanks for playing TermiCraft!\n\n";
+        case 3: { // High Scores
+            std::vector<HighScore> scores = loadHighScores();
+            showHighScores(scores);
+            break;
+        }
 
-  return 0;
+        case 4: { // How to Play
+            showHowToPlay();
+            break;
+        }
+
+        case 5: { // Quit
+            exitGame = true;
+            break;
+        }
+
+        } // switch
+    } // while !exitGame
+
+    restoreTerminal();
+    std::cout << "\n  Thanks for playing TermiCraft!\n\n";
+    return 0;
 }
