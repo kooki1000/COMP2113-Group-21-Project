@@ -38,7 +38,6 @@
 #include "colors.h"
 #include "menu.h"    // For getch() and clearScreen()
 #include "player.h"  // For checkCraftingProgression() and healPlayer()
-#include "utils.h"
 
 // Recipe definitions matching the progression chart
 const CraftingRecipe RECIPES[] = {
@@ -73,7 +72,6 @@ const CraftingRecipe RECIPES[] = {
      "Diamond Armor", "Legendary protection (+40 Max HP)"}};
 
 const int NUM_RECIPES = sizeof(RECIPES) / sizeof(RECIPES[0]);
-const int INNER_WIDTH = 78;  // Width between the ║ and ║ borders
 
 // Helper: Check if recipe is visible (prereqs met) vs locked
 bool isRecipeVisible(const GameState& state, const CraftingRecipe& recipe) {
@@ -142,17 +140,38 @@ bool performCrafting(GameState& state, const CraftingRecipe& recipe) {
 
 // Render the crafting interface
 void renderCraftingUI(const GameState& state, int selectedIndex) {
+    // Compute centering: box is 80 chars wide
+    int termCols, termRows;
+    getTermSize(termCols, termRows);
+    int leftPad = (termCols - 80) / 2;
+    if (leftPad < 0) leftPad = 0;
+    int rightCol = leftPad + 80;  // 1-indexed column of right border ║
+
+    std::string PAD(leftPad, ' ');
+
+    // Jump-to-right-border helper: positions cursor at rightCol then prints ║\n
+    // Using ANSI CHA (Cursor Horizontal Absolute): \033[Ncol]G
+    auto RB = [&]() {
+        // CHA is 1-indexed; move to rightCol then print border
+        std::cout << "\033[" << rightCol << "G" << COLOR_BOLD_CYAN << "║\n"
+                  << COLOR_RESET;
+    };
+
+    // Vertical centering: 21 rows total
+    int topPad = (termRows - 21) / 2;
+    if (topPad < 0) topPad = 0;
+
     clearScreen();
+    if (topPad > 0) std::cout << std::string(topPad, '\n');
 
     std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╔══════════════════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║  " << COLOR_BOLD_WHITE << "CRAFTING BENCH" << COLOR_BOLD_CYAN << "                              "
-              << COLOR_BOLD_WHITE << "INVENTORY" << COLOR_BOLD_CYAN
-              << "                       ║\n";
-    std::cout << "╠══════════════════════════════════════════════════════════════════════════════╣\n";
+    std::cout << PAD << "╔══════════════════════════════════════════════════════════════════════════════╗\n";
+    std::cout << PAD << "║  " << COLOR_BOLD_WHITE << "CRAFTING BENCH" << COLOR_BOLD_CYAN
+              << "                              " << COLOR_BOLD_WHITE << "INVENTORY"
+              << COLOR_BOLD_CYAN;
+    RB();
+    std::cout << PAD << "╠══════════════════════════════════════════════════════════════════════════════╣\n";
     std::cout << COLOR_RESET;
-
-    const int NAME_WIDTH = 20;
 
     // Print recipe list with inventory on the right
     for (int i = 0; i < NUM_RECIPES; i++) {
@@ -161,158 +180,125 @@ void renderCraftingUI(const GameState& state, int selectedIndex) {
         bool visible = isRecipeVisible(state, r);
         bool craftable = canCraft(state, r);
 
-        // Start line: ║ + space
-        std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
-
-        // Selection cursor (2 chars: symbol + space, or 2 spaces)
+        std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
         if (isSelected) {
-            std::cout << COLOR_BOLD_YELLOW << "▶ " << COLOR_RESET;
+            std::cout << COLOR_BOLD_YELLOW << "\xe2\x96\xb6 " << COLOR_RESET;  // ▶
         } else {
             std::cout << "  ";
         }
 
-        // Recipe name with appropriate color - ALWAYS width NAME_WIDTH for alignment
+        // Recipe name
         if (!visible) {
-            std::cout << COLOR_DIM << std::left << std::setw(NAME_WIDTH) << "[Locked]" << COLOR_RESET;
+            std::cout << COLOR_DIM << "  [Locked]          " << COLOR_RESET;
         } else if (craftable) {
-            std::cout << COLOR_GREEN << std::left << std::setw(NAME_WIDTH) << r.displayName << COLOR_RESET;
+            std::cout << COLOR_GREEN << std::left << std::setw(20) << r.displayName << COLOR_RESET;
         } else {
-            std::cout << COLOR_YELLOW << std::left << std::setw(NAME_WIDTH) << r.displayName << COLOR_RESET;
+            std::cout << COLOR_YELLOW << std::left << std::setw(20) << r.displayName << COLOR_RESET;
         }
 
-        // Gap
-        std::cout << COLOR_BOLD_CYAN << "  " << COLOR_RESET;
-
-        // Inventory column content
-        std::string invContent;
+        // Inventory column (gap then item)
+        std::cout << "          ";
         switch (i) {
             case 0:
-                invContent = std::string("Wood:    ") + COLOR_WOOD + std::to_string(state.player.inventory.wood) + COLOR_RESET;
+                std::cout << "Wood:    " << COLOR_WOOD << std::setw(3) << state.player.inventory.wood << COLOR_RESET;
                 break;
             case 1:
-                invContent = std::string("Stone:   ") + COLOR_STONE + std::to_string(state.player.inventory.stone) + COLOR_RESET;
+                std::cout << "Stone:   " << COLOR_STONE << std::setw(3) << state.player.inventory.stone << COLOR_RESET;
                 break;
             case 2:
-                invContent = std::string("Iron:    ") + COLOR_IRON + std::to_string(state.player.inventory.iron) + COLOR_RESET;
+                std::cout << "Iron:    " << COLOR_IRON << std::setw(3) << state.player.inventory.iron << COLOR_RESET;
                 break;
             case 3:
-                invContent = std::string("Gold:    ") + COLOR_GOLD_ORE + std::to_string(state.player.inventory.gold) + COLOR_RESET;
+                std::cout << "Gold:    " << COLOR_GOLD_ORE << std::setw(3) << state.player.inventory.gold << COLOR_RESET;
                 break;
             case 4:
-                invContent = std::string("Diamond: ") + COLOR_DIAMOND + std::to_string(state.player.inventory.diamond) + COLOR_RESET;
+                std::cout << "Diamond: " << COLOR_DIAMOND << std::setw(3) << state.player.inventory.diamond << COLOR_RESET;
                 break;
             case 6:
-                invContent = std::string("Equipped Pickaxe: ") + getMaterialColor(state.player.equipment.pickaxe) + getMaterialName(state.player.equipment.pickaxe) + COLOR_RESET;
+                std::cout << "Pickaxe: " << getMaterialColor(state.player.equipment.pickaxe)
+                          << std::left << std::setw(7) << getMaterialName(state.player.equipment.pickaxe) << COLOR_RESET;
                 break;
             case 7:
-                invContent = std::string("Equipped Armor:   ") + getMaterialColor(state.player.equipment.armor) + getMaterialName(state.player.equipment.armor) + COLOR_RESET;
+                std::cout << "Armor:   " << getMaterialColor(state.player.equipment.armor)
+                          << std::left << std::setw(7) << getMaterialName(state.player.equipment.armor) << COLOR_RESET;
                 break;
             case 8:
-                invContent = std::string("Health:   ") + COLOR_HEALTH + std::to_string(state.player.health) + "/" + std::to_string(state.player.maxHealth) + COLOR_RESET;
+                std::cout << "HP: " << COLOR_HEALTH << state.player.health << "/" << state.player.maxHealth << COLOR_RESET;
                 break;
             default:
-                invContent = "                ";
+                break;
         }
 
-        std::cout << invContent;
-
-        // Calculate padding to align right border
-        // Used: 1 (space after ║) + 2 (cursor) + 20 (name) + 2 (gap) + invContent width
-        int used = 1 + 2 + NAME_WIDTH + 2 + displayWidth(invContent);
-        int padding = INNER_WIDTH - used;
-        if (padding < 0) padding = 0;
-
-        std::cout << COLOR_BOLD_CYAN << std::string(padding, ' ') << "║\n"
-                  << COLOR_RESET;
+        RB();
     }
 
-    // Details box separator
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╠══════════════════════════════════════════════════════════════════════════════╣\n";
-    std::cout << COLOR_RESET;
+    // Details box
+    std::cout << PAD << COLOR_BOLD_CYAN
+              << "╠══════════════════════════════════════════════════════════════════════════════╣\n"
+              << COLOR_RESET;
 
     const CraftingRecipe& selected = RECIPES[selectedIndex];
     bool visible = isRecipeVisible(state, selected);
     bool craftable = canCraft(state, selected);
 
-    // Helper lambda to print a detail line with proper alignment
-    auto printDetailLine = [&](const std::string& label, const std::string& content) {
-        std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;  // 1 char inner used (space)
-        std::cout << label;
-        std::cout << content;
-
-        int used = 1 + displayWidth(label) + displayWidth(content);
-        int padding = INNER_WIDTH - used;
-        if (padding < 0) padding = 0;
-
-        std::cout << COLOR_BOLD_CYAN << std::string(padding, ' ') << "║\n"
-                  << COLOR_RESET;
-    };
-
     // Selected line
-    std::string selectedName = visible ? selected.displayName : "??? (Complete previous tier)";
-    std::string selectedColor = visible ? getMaterialColor(selected.tier) : COLOR_DIM;
-    printDetailLine("Selected: ", selectedColor + selectedName + COLOR_RESET);
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET
+              << COLOR_BOLD_WHITE << "Selected: " << COLOR_RESET;
+    if (visible)
+        std::cout << getMaterialColor(selected.tier) << selected.displayName << COLOR_RESET;
+    else
+        std::cout << COLOR_DIM << "??? (Complete previous tier)" << COLOR_RESET;
+    RB();
 
     // Cost line
-    std::string costStr;
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET << "Cost: ";
     if (!visible) {
-        costStr = std::string(COLOR_DIM) + "Unknown" + COLOR_RESET;
+        std::cout << COLOR_DIM << "Unknown" << COLOR_RESET;
     } else {
         bool first = true;
-        auto addCost = [&](int cost, const char* name, const char* color) {
+        auto printCost = [&](int cost, const char* name, const char* color) {
             if (cost > 0) {
-                if (!first) costStr += ", ";
-                costStr += std::string(color) + std::to_string(cost) + " " + name + COLOR_RESET;
+                if (!first) std::cout << ", ";
+                std::cout << color << cost << " " << name << COLOR_RESET;
                 first = false;
             }
         };
-
-        addCost(selected.woodCost, "Wood", COLOR_WOOD);
-        addCost(selected.stoneCost, "Stone", COLOR_STONE);
-        addCost(selected.ironCost, "Iron", COLOR_IRON);
-        addCost(selected.goldCost, "Gold", COLOR_GOLD_ORE);
-        addCost(selected.diamondCost, "Diamond", COLOR_DIAMOND);
-
-        if (costStr.empty()) costStr = std::string(COLOR_DIM) + "None" + COLOR_RESET;
+        printCost(selected.woodCost, "Wood", COLOR_WOOD);
+        printCost(selected.stoneCost, "Stone", COLOR_STONE);
+        printCost(selected.ironCost, "Iron", COLOR_IRON);
+        printCost(selected.goldCost, "Gold", COLOR_GOLD_ORE);
+        printCost(selected.diamondCost, "Diamond", COLOR_DIAMOND);
     }
-
-    printDetailLine("Cost: ", costStr);
+    RB();
 
     // Description line
-    std::string descStr = visible ? selected.description : "Complete previous tier to unlock";
-    printDetailLine("Description: ", std::string(COLOR_DIM) + descStr + COLOR_RESET);
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET
+              << COLOR_DIM << "Desc: " << COLOR_RESET;
+    if (visible)
+        std::cout << selected.description;
+    else
+        std::cout << "Complete previous tier to unlock";
+    RB();
 
     // Status line
-    std::string statusStr;
-    std::string statusColor;
-    if (craftable) {
-        statusStr = "✓ Ready to craft!";
-        statusColor = COLOR_GREEN;
-    } else if (!visible) {
-        statusStr = "🔒 Locked - craft previous tier first";
-        statusColor = COLOR_DIM;
-    } else {
-        statusStr = "✗ " + getCraftingError(state, selected);
-        statusColor = COLOR_WARNING;
-    }
-    printDetailLine("Status: ", statusColor + statusStr + COLOR_RESET);
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET << "Status: ";
+    if (craftable)
+        std::cout << COLOR_GREEN << "\xe2\x9c\x93 Ready to craft!" << COLOR_RESET;  // ✓
+    else if (!visible)
+        std::cout << COLOR_DIM << "Locked — craft previous tier first" << COLOR_RESET;
+    else
+        std::cout << COLOR_WARNING << "\xe2\x9c\x97 " << getCraftingError(state, selected) << COLOR_RESET;  // ✗
+    RB();
 
     // Footer
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╠══════════════════════════════════════════════════════════════════════════════╣\n";
-
-    std::string footerText = "[W/S] Navigate  [ENTER] Craft  [Q] Back";
-    std::cout << "║ " << COLOR_WHITE << footerText << COLOR_BOLD_CYAN;
-
-    int footerUsed = 1 + displayWidth(footerText);  // 1 for space after ║
-    int footerPad = INNER_WIDTH - footerUsed;
-    if (footerPad < 0) footerPad = 0;
-
-    std::cout << std::string(footerPad, ' ') << "║\n";
-
-    std::cout << "╚══════════════════════════════════════════════════════════════════════════════╝\n";
-    std::cout << COLOR_RESET;
+    std::cout << PAD << COLOR_BOLD_CYAN
+              << "╠══════════════════════════════════════════════════════════════════════════════╣\n"
+              << PAD << "║  " << COLOR_WHITE << "[W/S] Navigate  [ENTER] Craft  [Q] Back"
+              << COLOR_BOLD_CYAN;
+    RB();
+    std::cout << PAD << COLOR_BOLD_CYAN
+              << "╚══════════════════════════════════════════════════════════════════════════════╝\n"
+              << COLOR_RESET;
 }
 
 // Main crafting menu loop
@@ -365,18 +351,21 @@ void openCraftingMenu(GameState& state) {
                 if (canCraft(state, RECIPES[selected])) {
                     bool minigameTriggered = performCrafting(state, RECIPES[selected]);
                     if (minigameTriggered) {
+                        // Minigame was triggered, exit menu immediately
+                        // Main loop will detect state.minigameActive and state.phase
                         return;
                     }
-                    usleep(500000);
+                    // Small delay to show success message
+                    usleep(500000);  // 500ms
                 } else {
-                    std::cout << "\a";
+                    // Error flash
+                    std::cout << "\a";  // Bell
                 }
-
                 break;
 
             case 'q':
             case 'Q':
-                return;
+                return;  // Exit to game
         }
     }
 }
