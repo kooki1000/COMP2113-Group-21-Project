@@ -13,7 +13,39 @@
 #define COLORS_H
 
 #include <iostream>
+#include <string>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include "types.h"
+
+inline void getTermSize(int& cols, int& rows) {
+    struct winsize ws = {};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {
+        cols = (int)ws.ws_col;
+        rows = (int)ws.ws_row;
+    } else {
+        cols = 80; rows = 24;
+    }
+}
+
+// Returns a string of spaces to left-pad content of given pixel width to center it
+inline std::string hpad(int contentWidth) {
+    int cols, rows;
+    getTermSize(cols, rows);
+    int pad = (cols - contentWidth) / 2;
+    if (pad < 0) pad = 0;
+    return std::string(pad, ' ');
+}
+
+// Clear screen then move cursor down so content of `lines` height is vertically centered
+inline void clearAndCenterV(int contentLines) {
+    std::cout << "\033[2J\033[H";
+    int cols, rows;
+    getTermSize(cols, rows);
+    int top = (rows - contentLines) / 2;
+    if (top > 0) std::cout << std::string(top, '\n');
+    std::cout.flush();
+}
 
 // ----- RESET -----
 #define COLOR_RESET   "\033[0m"
@@ -70,11 +102,11 @@
 #define COLOR_SKY       "\033[38;5;117m"   // light blue
 #define COLOR_GRASS     "\033[38;5;34m"    // bright green
 #define COLOR_DIRT      "\033[38;5;94m"    // brown
-#define COLOR_STONE     "\033[38;5;245m"   // gray
-#define COLOR_COAL      "\033[38;5;236m"   // dark gray
-#define COLOR_IRON      "\033[38;5;252m"   // silver
-#define COLOR_GOLD_ORE  "\033[38;5;220m"   // gold
-#define COLOR_DIAMOND   "\033[38;5;51m"    // cyan/diamond blue
+#define COLOR_STONE     "\033[38;5;102m"   // medium gray rock
+#define COLOR_COAL      "\033[38;5;238m"   // near-black dark gray
+#define COLOR_IRON      "\033[38;5;208m"   // rust/burnt orange
+#define COLOR_GOLD_ORE  "\033[38;5;220m"   // bright yellow gold
+#define COLOR_DIAMOND   "\033[95m"         // bright magenta/pink
 #define COLOR_WOOD      "\033[38;5;130m"   // brown wood
 #define COLOR_LEAVES    "\033[38;5;28m"    // dark green
 #define COLOR_BEDROCK   "\033[38;5;232m"   // almost black
