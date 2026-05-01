@@ -338,13 +338,6 @@ void resolveMiningAttempt(GameState& state, bool minigameWon) {
     state.currentMinigame = MINIGAME_NONE;
 }
 
-// Physics update (gravity removed - player can fly)
-void updatePhysics(GameState& state) {
-    // No gravity - player can fly freely within bounds
-    if (!state.player.alive) return;
-    // Empty - no automatic physics updates needed for flying player
-}
-
 // Handle single keypress
 void handleInput(GameState& state, char input) {
     bool moved = false;
@@ -352,22 +345,30 @@ void handleInput(GameState& state, char input) {
     switch (input) {
         case 'w':
         case 'W':
-            moved = movePlayer(state, 0, -1);  // Up
+            state.player.facingX = 0;
+            state.player.facingY = -1;
+            moved = movePlayer(state, 0, -1);
             break;
         case 's':
         case 'S':
-            moved = movePlayer(state, 0, 1);  // Down
+            state.player.facingX = 0;
+            state.player.facingY = 1;
+            moved = movePlayer(state, 0, 1);
             break;
         case 'a':
         case 'A':
-            moved = movePlayer(state, -1, 0);  // Left
+            state.player.facingX = -1;
+            state.player.facingY = 0;
+            moved = movePlayer(state, -1, 0);
             break;
         case 'd':
         case 'D':
-            moved = movePlayer(state, 1, 0);  // Right
+            state.player.facingX = 1;
+            state.player.facingY = 0;
+            moved = movePlayer(state, 1, 0);
             break;
 
-        case ' ':  // Mine - faces direction and initiates mining
+        case ' ':  // Mine - now initiates minigame challenge
             initiateMining(state);
             break;
 
@@ -396,14 +397,13 @@ void handleInput(GameState& state, char input) {
     if (moved) {
         // Clear message on move unless it was important
         if (state.lastMessage.find("Failed") == std::string::npos &&
-            state.lastMessage.find("Success") == std::string::npos &&
-            state.lastMessage.find("fled") == std::string::npos) {
+            state.lastMessage.find("Success") == std::string::npos) {
             state.lastMessage = "";
         }
     }
 }
 
-// Damage player (now used for minigame failure and escape)
+// Damage player (now used for minigame failure)
 void damagePlayer(GameState& state, int amount) {
     state.player.health -= amount;
     if (state.player.health <= 0) {
@@ -483,23 +483,22 @@ bool checkCraftingProgression(GameState& state) {
         if (newPick != state.pendingUpgrade) {
             state.pendingUpgrade = newPick;
 
-            // For crafting upgrades, use random selection
-            int r = rand() % MINIGAME_COUNT;
-            if (r == 0) {
-                state.currentMinigame = MINIGAME_WORDLE;
-            } else if (r == 1) {
-                state.currentMinigame = MINIGAME_MINESWEEPER;
-            } else if (r == 2) {
-                state.currentMinigame = MINIGAME_SUDOKU;
-            } else {
-                state.currentMinigame = MINIGAME_PLACEHOLDER_4TH;
-            }
+            selectRandomMinigame(state);
+
+            // Signal the main loop to run the minigame
+            state.phase = PHASE_MINIGAME;
+            state.minigameActive = true;
+            state.miningPending = true;  // reuse flag — main loop checks this
+            // Store player pos as the "pending" position so trySpawnEnemy has valid coords
+            state.pendingMinePos = state.player.pos;
+            state.pendingMineType = BLOCK_AIR;  // not a real mine, just a crafting trial
 
             std::string tierName = getMaterialName(newPick);
-            state.lastMessage = "Rite of Passage: Craft " + tierName + " tools!";
+            state.lastMessage = "Rite of Passage: Prove yourself to wield " + tierName + "!";
             return true;
         }
     }
+
     return false;
 }
 
@@ -522,4 +521,20 @@ void confirmUpgrade(GameState& state) {
 // Get color based on armor tier for player rendering
 const char* getPlayerArmorColor(const GameState& state) {
     return getMaterialColor(state.player.equipment.armor);
+}
+
+// Roll to spawn an enemy at the mined position
+void trySpawnEnemy(GameState& state, Position minedPos) {
+    if (state.settings.enemySpawnChance == 0) return;
+    if (rand() % 100 >= state.settings.enemySpawnChance) return;
+
+    Enemy e;
+    e.pos = minedPos;
+    int scaledHp = 20 * state.settings.enemyHealthMult / 100;
+    e.health = e.maxHealth = std::max(5, scaledHp);
+    e.damage = (state.difficulty == DIFF_HARD) ? 15 : 10;
+    e.alive = true;
+    e.symbol = 'B';
+    e.name = "Cave Bug";
+    state.enemies.push_back(e);
 }
