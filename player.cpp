@@ -23,15 +23,15 @@
 #include "player.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
-#include <random>
 
 #include "colors.h"
 #include "crafting.h"
 #include "menu.h"
-#include "score.h"
+#include "score.h"  // addScore() — centralised score increment with multiplier
 
 // Initialize player at the dragon carcass spawn point
 void initPlayer(GameState& state, const std::string& playerName) {
@@ -129,7 +129,7 @@ MaterialTier getRequiredTierForBlock(BlockType block) {
             return MATERIAL_DIAMOND;
 
         case BLOCK_DRAGON_CAVE:
-            return MATERIAL_DIAMOND;  // Can excavate carcass with diamond tools
+            return MATERIAL_NONE;  // Anyone brave enough can try their luck
 
         default:
             return MATERIAL_NONE;
@@ -149,11 +149,6 @@ bool movePlayer(GameState& state, int dx, int dy) {
 
     // Bounds checking
     if (newX < 0 || newX >= state.worldWidth || newY < 0 || newY >= state.worldHeight) {
-        return false;
-    }
-
-    // Flight height limit (cannot fly above MAX_FLIGHT_HEIGHT)
-    if (newY < MAX_FLIGHT_HEIGHT) {
         return false;
     }
 
@@ -194,7 +189,18 @@ void updateCamera(GameState& state) {
     state.camera.y = idealY;
 }
 
-// Initiate mining attempt - validates target then triggers minigame or mines immediately
+// Select random minigame using MINIGAME_COUNT constant
+void selectRandomMinigame(GameState& state) {
+    int r = rand() % MINIGAME_COUNT;  // Uses constant from types.h
+
+    if (r == 0) {
+        state.currentMinigame = MINIGAME_WORDLE;
+    } else {
+        state.currentMinigame = MINIGAME_MINESWEEPER;
+    }
+}
+
+// Initiate mining attempt - validates target then triggers minigame
 void initiateMining(GameState& state) {
     // Calculate target position based on facing direction
     int targetX = state.player.pos.x + state.player.facingX;
@@ -231,88 +237,31 @@ void initiateMining(GameState& state) {
     state.pendingMineType = targetType;
     state.miningPending = true;
 
-    // Handle different block types
-    switch (targetType) {
-        case BLOCK_WOOD:
-        case BLOCK_LEAVES:
-            // Wood: increment counter and mine immediately (no minigame)
-            state.woodMinedCount++;
-            resolveMiningAttempt(state, MINIGAME_WIN);
-            break;
+    // Minigame trigger probability: random float in [10%, 16%], strictly bounded
+    // by the ratio of distinct minable ore types to number of minigames.
+    // Formula: chance = rand[0.10, 0.16] * (MINIGAME_COUNT / NUM_DISTINCT_ORES)
+    // — rare enough to not be annoying, still meaningful for high-value ores.
+    static const float NUM_DISTINCT_ORES = 6.0f;  // wood stone coal iron gold diamond
+    float base = 0.10f + 0.06f * (static_cast<float>(rand()) / static_cast<float>(RAND_MAX));
+    float triggerChance = base * (static_cast<float>(MINIGAME_COUNT) / NUM_DISTINCT_ORES);
+    float roll = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
 
-        case BLOCK_STONE:
-        case BLOCK_IRON:
-        case BLOCK_GOLD:
-        case BLOCK_DIAMOND: {
-            // Map ore type to index: Stone=0, Iron=1, Gold=2, Diamond=3
-            int oreIndex;
-            if (targetType == BLOCK_STONE)
-                oreIndex = 0;
-            else if (targetType == BLOCK_IRON)
-                oreIndex = 1;
-            else if (targetType == BLOCK_GOLD)
-                oreIndex = 2;
-            else
-                oreIndex = 3;  // DIAMOND
-
-            // Increment respective counter immediately (tracks even if escape/fail)
-            switch (targetType) {
-                case BLOCK_STONE:
-                    state.stoneMinedCount++;
-                    break;
-                case BLOCK_IRON:
-                    state.ironMinedCount++;
-                    break;
-                case BLOCK_GOLD:
-                    state.goldMinedCount++;
-                    break;
-                case BLOCK_DIAMOND:
-                    state.diamondMinedCount++;
-                    break;
-                default:
-                    break;
-            }
-
-            // Check if this ore's minigame has been triggered before
-            if (!state.oreMinigameTriggered[oreIndex]) {
-                // First time mining this ore - trigger minigame
-                state.oreMinigameTriggered[oreIndex] = true;
-                state.minigameActive = true;
-                state.currentMinigame = state.oreMinigameSlots[oreIndex];
-                state.phase = PHASE_MINIGAME;
-
-                // Don't resolve yet - wait for minigame result
-                std::string gameName;
-                switch (state.currentMinigame) {
-                    case MINIGAME_WORDLE:
-                        gameName = "Wordle";
-                        break;
-                    case MINIGAME_MINESWEEPER:
-                        gameName = "Minesweeper";
-                        break;
-                    case MINIGAME_SUDOKU:
-                        gameName = "Sudoku";
-                        break;
-                    case MINIGAME_PLACEHOLDER_4TH:
-                        gameName = "Challenge";
-                        break;
-                    default:
-                        gameName = "Unknown";
-                        break;
-                }
-                state.lastMessage = "Mining challenge: " + gameName + "!";
-            } else {
-                // Already triggered before, mine immediately
-                resolveMiningAttempt(state, MINIGAME_WIN);
-            }
-            break;
-        }
-
-        default:
-            // Other blocks (dirt, grass, coal, etc): immediate mining
-            resolveMiningAttempt(state, MINIGAME_WIN);
-            break;
+    if (roll >= triggerChance && targetType != BLOCK_DRAGON_CAVE) {
+        // No minigame this time — instant mine (dragon cave always requires a challenge)
+        resolveMiningAttempt(state, true);
+        state.miningPending = false;
+        state.minigameActive = false;
+        state.currentMinigame = MINIGAME_NONE;
+        return;
     }
+
+    // Select and setup minigame
+    selectRandomMinigame(state);
+    state.minigameActive = true;
+    state.phase = PHASE_MINIGAME;
+
+    std::string gameName = (state.currentMinigame == MINIGAME_WORDLE) ? "Wordle" : "Minesweeper";
+    state.lastMessage = "Mining challenge: " + gameName + "!";
 }
 
 // Resolve mining attempt after minigame completes
