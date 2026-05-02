@@ -73,23 +73,32 @@ static const char STAR_CHARS[] = {'.', '+', '*', '`'};
 static int getSunCol(int vpWidth) {
     TimeOfDay tod = getTimeOfDay();
     int t = tickCount % CYCLE_LENGTH;
+    int col;
 
     switch (tod) {
         case TIME_DAY: {
             float p = (float)(t - DAY_START) / (DUSK_START - DAY_START);
-            return (int)(vpWidth * 0.15f + p * vpWidth * 0.7f);
+            col = (int)(vpWidth * 0.15f + p * vpWidth * 0.7f);
+            break;
         }
         case TIME_DUSK: {
             float p = (float)(t - DUSK_START) / (NIGHT_START - DUSK_START);
-            return (int)(vpWidth * 0.85f + p * vpWidth * 0.15f);
+            col = (int)(vpWidth * 0.85f + p * vpWidth * 0.15f);
+            break;
         }
         case TIME_DAWN: {
             float p = (float)(t - DAWN_START) / (CYCLE_LENGTH - DAWN_START);
-            return (int)(p * vpWidth * 0.15f);
+            col = (int)(p * vpWidth * 0.15f);
+            break;
         }
         default:
             return -100; // off-screen during night
     }
+
+    // Clamp so sun art (5 chars wide) never renders past the viewport edge
+    if (col < 0)           col = 0;
+    if (col > vpWidth - 5) col = vpWidth - 5;
+    return col;
 }
 
 static int getMoonCol(int vpWidth) {
