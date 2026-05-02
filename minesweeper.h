@@ -3,19 +3,30 @@
 
 #include <vector>
 #include <chrono>
-#include "types.h"
+#include <termios.h>
+#include <unistd.h>
 
 class Minesweeper {
 public:
     Minesweeper(int size, int mines);
-    MinigameResult playGame();
+    void playGame();
+    bool didWin() const { return win; }
 
 private:
+    int size;
+    int mines;
+    std::vector<std::vector<bool>> mineGrid;
+    std::vector<std::vector<int>>  solutionGrid;
+    std::vector<std::vector<char>> revealedGrid;
+    bool gameOver;
+    bool win;
+    std::chrono::steady_clock::time_point startTime;
+
     void initializeGrids(int size);
     void placeMines();
-    void fillSolutionGrid();  
+    void fillSolutionGrid();
     bool isValidMove(int x, int y);
-    int countAdjacentMines(int x, int y);
+    int  countAdjacentMines(int x, int y);
     void revealSingleCell(int x, int y);
     void floodReveal(int x, int y);
     void flagCell(int x, int y);
@@ -30,8 +41,8 @@ private:
     void showHighScore();
     void saveHighScore(double time);
     void gameOverMessage();
-
 };
-MinigameResult runMinesweeper(int gridSize);
+
+bool runMinesweeper(int gridSize);
 
 #endif
