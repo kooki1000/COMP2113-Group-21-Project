@@ -1,3 +1,44 @@
+// =============================================================================
+// twentyfour.cpp
+// TermiCraft — 24 Game Minigame Module Implementation
+// 24 is a minigame based on the math card game 24 where players are given
+// four cards from a deck and expected to create the number 24 thorugh a series 
+// of math operations. Since not all four-card combination can create the number
+// 24, this game uses a puzzle database of a list of 4 numbers that have a solution.
+// The puzzle-base is the csv file titled "twentyfourpuzzles.csv"
+//
+// Puzzle Management
+//   - loadPuzzleNumbers() + parseNumbers(): Load and parse 4-number puzzles
+//     from twentyfourpuzzles.csv. Skips header and malformed lines.
+//   - pickCards(): Randomly selects one puzzle and converts numbers into
+//     card structs (with face symbols and random suits for display).
+//
+// Game Display
+//   - printCards(): Renders the four cards in ASCII poker-card style using
+//     box-drawing characters and suit symbols.
+//
+// Input Handling & Validation
+//   - validateInput(): Checks allowed characters and uses EquationEvaluator
+//     to ensure the expression can be parsed safely.
+//   - checkNumbersUsed(): Verifies the player used each of the four card
+//     values exactly once.
+//   - evaluateInput(): Evaluates the expression and checks if result == 24
+//     (with floating-point tolerance).
+//
+// Main Game Loop
+//   - playGame(): full game logic — loads puzzles, picks cards,
+//     prints UI, runs the timed/attempt-limited loop, handles win/lose/escape,
+//     and returns MinigameResult.
+//   - runTwentyFour(): Simple wrapper called from main game (passes difficulty
+//     settings for attempts and timeLimit).
+//
+// Integration
+//   Triggered when players try to mine an ore.
+//
+// Author: Nan
+// Dependencies: twentyfour.h, equationevaluator.h, types.h
+// Standard headers only. No external libraries required.
+// =============================================================================
 #include <iostream>
 #include <vector>
 #include <string>
@@ -96,6 +137,7 @@ private:
     bool validateInput(std::string expression);
     bool checkNumbersUsed(const std::string& expression, std::vector<card> numbers);
 };
+
 //displays numbers in a way that resembles poker cards
 void TwentyFour::printCards(const std::vector<card>& cards) {
     for (const auto& card : cards) std::cout << "┌─────────┐ ";
