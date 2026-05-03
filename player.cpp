@@ -54,21 +54,20 @@ void initPlayer(GameState& state, const std::string& playerName) {
     // Spawn at the forest biome surface (col 10, just above ground level).
     // Walk down from sky until we hit the first non-sky, non-air block, then
     // stand one row above it so the player is on the surface grass.
-    {
-        int spawnX = 10;
-        int spawnY = SURFACE_LEVEL - 1;  // default fallback
 
-        for (int y = 0; y < state.worldHeight - 1; y++) {
-            BlockType t = state.world[y][spawnX].type;
-            if (t != BLOCK_SKY && t != BLOCK_AIR) {
-                spawnY = y - 1;  // stand one row above first solid block
-                if (spawnY < 0) spawnY = 0;
-                break;
-            }
+    int spawnX = 10;
+    int spawnY = SURFACE_LEVEL - 1;  // default fallback
+
+    for (int y = 0; y < state.worldHeight - 1; y++) {
+        BlockType t = state.world[y][spawnX].type;
+        if (t != BLOCK_SKY && t != BLOCK_AIR) {
+            spawnY = y - 1;  // stand one row above first solid block
+            if (spawnY < 0) spawnY = 0;
+            break;
         }
-
-        state.player.pos = Position(spawnX, spawnY);
     }
+
+    state.player.pos = Position(spawnX, spawnY);
 
     // Initialize camera to center player
     updateCamera(state);
