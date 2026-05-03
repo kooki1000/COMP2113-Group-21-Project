@@ -881,6 +881,7 @@ bool runWordle(int wordLength) {
         if (guess == target) won = true;
     }
 
+    
     renderWordleBoard(guesses, target, wordLength);
 
 

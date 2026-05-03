@@ -100,7 +100,14 @@ private:
      * Returns true if safe, false otherwise.
      */
     bool isSafe(int r, int c, int num) {
-        // Check row and column
+
+        // =======================================================
+        // ROW & COLUMN VALIDATION
+        // Ensures Sudoku constraint: each number must be unique
+        // within its row and column before placement is allowed.
+        // This is the first and cheapest validity filter.
+        // =======================================================
+        
         for (int i = 0; i < size; i++) {
             if (grid[r][i] == num || grid[i][c] == num)
                 return false;
