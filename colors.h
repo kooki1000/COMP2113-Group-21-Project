@@ -1,6 +1,6 @@
 /* TEAMNOTE START::
  * colors.h
- * 
+ * SHEIKH SAARIM
  * ANSI escape codes for terminal colors and cursor control.
  * Include this if you want to make text colorful or move the cursor around.
  * 
@@ -159,6 +159,11 @@ inline const char* getMaterialColor(MaterialTier tier) {
         case MATERIAL_DIAMOND: return COLOR_DIAMOND;
         default:               return COLOR_WHITE;
     }
+}
+
+// Alias: same as getMaterialColor, used in crafting UI
+inline const char* getTierColor(MaterialTier tier) {
+    return getMaterialColor(tier);
 }
 
 // color for difficulty text
