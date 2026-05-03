@@ -1,3 +1,33 @@
+// =============================================================================
+// evaluator.cpp
+// TermiCraft — Expression Evaluator Module Implementation
+//
+// Full implementation of a safe mathematical expression evaluator for the
+// 24 Game minigame and other TermiCraft progression systems.
+//
+// Uses the Shunting-Yard algorithm to convert infix expressions (with + - * /
+// and parentheses) into Reverse Polish Notation (RPN), then evaluates the RPN
+// using a stack. This approach avoids direct eval() risks and allows easy
+// validation of number usage.
+//
+// Features:
+//   - shunting_yard(): Converts infix to RPN while respecting operator
+//     precedence and parentheses.
+//   - evaluate_rpn(): Evaluates the RPN expression using a value stack.
+//   - evaluate(): High-level function that combines the above for a given
+//     string expression.
+//   - checkNumbersUsed(): Verifies the player used each required card value
+//     exactly once (critical for 24 Game rules).
+//
+// Integration: Used by the TwentyFour class to validate and compute player
+// input during the minigame. Returns double result or throws on invalid
+// expressions. Designed to be lightweight with no external dependencies.
+//
+// Author: Nan
+// Dependencies: evaluator.h
+// Standard headers only (<stack>, <queue>, <map>, <sstream>, <cctype>, <cmath>)
+// =============================================================================
+
 #include <stack>
 #include <queue>
 #include <map>
@@ -93,6 +123,7 @@ bool evaluator::checkNumbersUsed(const std::string expression, std::vector<int> 
     return usedNumbers == numbers;
 }
 
+//Evaluates the rpn expression using a stack logic
 double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
     std::stack<double> values;
     for (const std::string& token : rpn) {
@@ -116,6 +147,7 @@ double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
 return values.top();
 }
 
+//combines expression to rpn converter and rpn evaluator to return a single double value
 double evaluator::evaluate(const std::string& expression) {
     std::vector<std::string> rpn = shunting_yard(expression);
     return evaluate_rpn(rpn);
