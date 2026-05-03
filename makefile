@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++11 -Wall -Wextra -pedantic
 TARGET  = termicraft
 OBJECTS = main.o menu.o fileio.o player.o final_fight.o score.o \
           crafting.o world_gen.o fog_of_war.o day_night.o \
-          wordle.o minesweeper.o
+          wordle.o minesweeper.o twentyfour.o equationevaluator.o sudoku.o
 
 # ----- Link step -----
 $(TARGET): $(OBJECTS)
@@ -46,6 +46,15 @@ wordle.o: wordle.cpp colors.h menu.h types.h
 	$(CXX) $(CXXFLAGS) -c $<
 
 minesweeper.o: minesweeper.cpp minesweeper.h colors.h types.h
+	$(CXX) $(CXXFLAGS) -c $<
+	
+twentyfour.o: twentyfour.cpp twentyfour.h equationevaluator.h colors.h menu.h types.h
+	$(CXX) $(CXXFLAGS) -c $<
+
+equationevaluator.o: equationevaluator.cpp equationevaluator.h
+	$(CXX) $(CXXFLAGS) -c $<
+
+sudoku.o: sudoku.cpp colors.h menu.h types.h
 	$(CXX) $(CXXFLAGS) -c $<
 
 # ----- Phony targets -----
