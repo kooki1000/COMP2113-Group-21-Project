@@ -33,7 +33,7 @@
 class evaluator{
     public:
     double evaluate(const std::string& expression);
-    bool checkNumbersUsed(const std::string expression, std::vector<int> numbers);
+    bool checkNumbersUsed(const std::string& expression, std::vector<int> numbers);
     private:
     std::map<char, int> precedence = {
             {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2}
