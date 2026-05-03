@@ -1,7 +1,27 @@
-/*
- * main.cpp
- * TermiCraft — entry point and game loop
- */
+// =============================================================================
+// main.cpp
+// TermiCraft — Entry Point, Game Loop & Integration Layer
+//
+// This is our core file that connects every module. It handles terminal setup,
+// the main menu flow, launching new/loaded games, and the core game loop that
+// runs every frame — processing input, ticking enemies, firing random events,
+// updating the viewport on resize, and calling the renderer.
+//
+// Also contains the dragon cave entry sequence (the full-screen popup before
+// the boss fight) and the pause menu.
+//
+// Key functions:
+//   - main()              Entry point. Runs the main menu loop.
+//   - gameLoop()          Frame-by-frame game logic — input → update → render.
+//   - initGame()          Allocates world, spawns player, sets difficulty.
+//   - updateViewportSize() Reads live terminal dimensions via ioctl().
+//   - updateEnemies()     Moves enemies toward player, handles contact damage.
+//   - dragonCaveSequence() Full-screen popup before handing off to final_fight.
+//   - runPauseMenu()      Pause overlay — resume, save, or quit.
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: all modules
+// =============================================================================
 
 #include <algorithm>
 #include <csignal>
