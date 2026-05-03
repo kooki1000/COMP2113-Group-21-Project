@@ -39,14 +39,25 @@
 // Dependencies: twentyfour.h, equationevaluator.h, types.h
 // Standard headers only. No external libraries required.
 // =============================================================================
-#include <iostream>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <chrono>
+#include "twentyfour.h"
+
+#include "colors.h"
 #include "equationevaluator.h"
+#include "menu.h"
 #include "types.h"
+
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <termios.h>
+#include <unistd.h>
+#include <vector>
 
 //parses puzzle numbers from puzzle bank
 static std::vector<int> parseNumbers(const std::string& numbersStr) {
@@ -121,7 +132,7 @@ struct card {
 class TwentyFour {
 public:
     TwentyFour();
-    MinigameResult playGame(int attempts, int timeLimit);
+    bool playGame(int attempts, int timeLimit);
     
 private:
     int gamestate;
