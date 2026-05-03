@@ -51,20 +51,23 @@ Minesweeper::Minesweeper(int size, int mines) : size(size), mines(mines) {
     startTime = std::chrono::steady_clock::now();
 }
 
-//Private helpers 
+//Clears screen 
 void Minesweeper::clearScreen() {
     std::cout << "\033[2J\033[H";
     std::cout.flush();
 }
 
+//Converts user input to upper case so input is not case sensitive
 char Minesweeper::toUpper(char c) {
     return (char)toupper((unsigned char)c);
 }
 
+//Checks if user input coordinates are within grid size
 bool Minesweeper::isValidMove(int x, int y) {
     return x >= 0 && x < size && y >= 0 && y < size;
 }
 
+//Checks the number of adjacent mines 
 int Minesweeper::countAdjacentMines(int x, int y) {
     int count = 0;
     for (int i = -1; i <= 1; ++i) {
@@ -77,6 +80,10 @@ int Minesweeper::countAdjacentMines(int x, int y) {
     return count;
 }
 
+//Initializes grids with default values.
+//Mine grid default value: false
+//Solution grid default value: 0
+//Reveal grid default value: #
 void Minesweeper::initializeGrids(int sz) {
     this->size = sz;
     mineGrid.assign(sz, std::vector<bool>(sz, false));
@@ -84,6 +91,7 @@ void Minesweeper::initializeGrids(int sz) {
     revealedGrid.assign(sz, std::vector<char>(sz, '#'));
 }
 
+//Randomly chooses mine cells and modifies mine grid to reflect that
 void Minesweeper::placeMines() {
     int count = 0;
     while (count < mines) {
@@ -96,12 +104,14 @@ void Minesweeper::placeMines() {
     }
 }
 
+//Fills the solution grid with the number of adjacent mines at each cell. At mines, cell value is -1
 void Minesweeper::fillSolutionGrid() {
     for (int x = 0; x < size; x++)
         for (int y = 0; y < size; y++)
             solutionGrid[x][y] = mineGrid[x][y] ? -1 : countAdjacentMines(x, y);
 }
 
+//Logic for revealing a single cell by changing the value on the revealed grid to the corresponding value on the solution grid
 void Minesweeper::revealSingleCell(int x, int y) {
     if (!isValidMove(x, y) || revealedGrid[x][y] != '#') return;
     if (mineGrid[x][y]) { gameOver = true; return; }
@@ -111,6 +121,8 @@ void Minesweeper::revealSingleCell(int x, int y) {
         revealedGrid[x][y] = '0' + solutionGrid[x][y];
 }
 
+//A flood reveal is triggered when the player reveals a cell with 0 adjacent mines. This means that all of its adjacent
+//cells will also be revealed until a cell with neighboring mines is reached. This is performed recursively
 void Minesweeper::floodReveal(int x, int y) {
     if (!isValidMove(x, y) || revealedGrid[x][y] != '#') return;
     revealedGrid[x][y] = (solutionGrid[x][y] == 0) ? ' ' : ('0' + solutionGrid[x][y]);
@@ -122,6 +134,7 @@ void Minesweeper::floodReveal(int x, int y) {
         }
 }
 
+//Flags a cel.
 void Minesweeper::flagCell(int x, int y) {
     if (!isValidMove(x, y)) return;
     if (revealedGrid[x][y] == '#')
@@ -131,6 +144,7 @@ void Minesweeper::flagCell(int x, int y) {
     // Ignore flag attempts on already-revealed cells
 }
 
+//Checks if all non-mine cells have been revealed
 bool Minesweeper::checkWin() {
     for (int x = 0; x < size; x++)
         for (int y = 0; y < size; y++)
@@ -139,6 +153,7 @@ bool Minesweeper::checkWin() {
     return true;
 }
 
+//Shows the position of mines at the end of the game
 void Minesweeper::revealMines() {
     for (int x = 0; x < size; x++)
         for (int y = 0; y < size; y++)
@@ -146,14 +161,14 @@ void Minesweeper::revealMines() {
                 revealedGrid[x][y] = 'M';
 }
 
+//Time tracking system
 double Minesweeper::getElapsedTime() {
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - startTime;
     return elapsed.count();
 }
 
-// Display 
-
+// Displays grid
 void Minesweeper::displayBoard() {
     std::string boardP = hpad(3 + size * 2);
 
@@ -193,7 +208,6 @@ void Minesweeper::displayBoard() {
 }
 
 // High score saving
-
 void Minesweeper::saveHighScore(double time) {
     const std::string filename = "minesweeper_best.txt";
     double best = 999999.0;
@@ -207,6 +221,7 @@ void Minesweeper::saveHighScore(double time) {
     }
 }
 
+//High score showing at the end of the game
 void Minesweeper::showHighScore() {
     const std::string filename = "minesweeper_best.txt";
     std::ifstream fin(filename);
@@ -221,7 +236,6 @@ void Minesweeper::showHighScore() {
 }
 
 //Game over message
-
 void Minesweeper::gameOverMessage() {
     ::clearAndCenterV(win ? 12 : 10);
     std::string Aw = hpad(63);   
@@ -328,7 +342,6 @@ void Minesweeper::makeMove(char action, int x, int y) {
 }
 
 //Main game loop 
-
 void Minesweeper::playGame() {
     while (!gameOver) {
         int boxW = std::max(3 + size * 2 + 4, 36);
@@ -375,7 +388,7 @@ void Minesweeper::playGame() {
     gameOverMessage();
 }
 
-
+//Function called in main to launch game
 bool runMinesweeper(int gridSize) {
     int mineCount = (gridSize * gridSize) / 5;
     if (mineCount < 3) mineCount = 3;
@@ -389,9 +402,6 @@ bool runMinesweeper(int gridSize) {
     srand((unsigned int)time(0));
     Minesweeper game(gridSize, mineCount);
     game.playGame();
-
-    // Return to raw mode (caller — main.cpp — will call setupTerminal() after us,
-    // but we restore raw here in case the minigame exits mid-session)
     cooked.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &cooked);
 
