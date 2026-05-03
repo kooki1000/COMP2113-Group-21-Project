@@ -1,3 +1,25 @@
+// =============================================================================
+// minesweeper.h
+// TermiCraft — Minesweeper Minigame Module Header
+//
+// Declares the Minesweeper minigame for TermiCraft. This module handles the
+// grid-based minesweeper minigame.
+//
+// The minigame is triggered automatically in the main game loop when the
+// player tries to mine an ore block (after successful stone-tier Wordle
+// progression). It enforces classic Minesweeper rules with numbered hints,
+// flagging, flood-fill reveal, and win/loss detection. High-score tracking
+// with elapsed time adds replay value and ties into the game's equipment
+// progression system.
+//
+// Integration with the main TermiCraft game is handled through the
+// pendingUpgrade flag in GameState. On successful completion, the player
+// successfully mines the ore; failure results in no ore; escape results
+// in losing HP.
+//
+// Author:       Nan
+// Dependencies: termios.h, unistd.h
+// =============================================================================
 #ifndef MINESWEEPER_H
 #define MINESWEEPER_H
 
