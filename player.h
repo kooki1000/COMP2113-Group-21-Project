@@ -21,7 +21,6 @@
 #define PLAYER_H
 
 #include <string>
-
 #include "types.h"
 
 // Initialize the player state at game start.

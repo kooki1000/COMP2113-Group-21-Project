@@ -64,8 +64,10 @@ void initPlayer(GameState& state, const std::string& playerName) {
     // Spawn at the forest biome surface (col 10, just above ground level).
     // Walk down from sky until we hit the first non-sky, non-air block, then
     // stand one row above it so the player is on the surface grass.
+
     int spawnX = 10;
     int spawnY = SURFACE_LEVEL - 1;  // default fallback
+
     for (int y = 0; y < state.worldHeight - 1; y++) {
         BlockType t = state.world[y][spawnX].type;
         if (t != BLOCK_SKY && t != BLOCK_AIR) {
@@ -74,6 +76,7 @@ void initPlayer(GameState& state, const std::string& playerName) {
             break;
         }
     }
+
     state.player.pos = Position(spawnX, spawnY);
 
     // Initialize camera to center player
@@ -249,12 +252,16 @@ void updateCamera(GameState& state) {
 // Effects:
 // - Sets state.currentMinigame to Wordle or Minesweeper.
 void selectRandomMinigame(GameState& state) {
-    int r = rand() % MINIGAME_COUNT;  // Uses constant from types.h
+    int r = rand() % MINIGAME_COUNT;
 
     if (r == 0) {
         state.currentMinigame = MINIGAME_WORDLE;
-    } else {
+    } else if (r == 1) {
         state.currentMinigame = MINIGAME_MINESWEEPER;
+    } else if (r == 2) {
+        state.currentMinigame = MINIGAME_TWENTYFOUR;
+    } else {
+        state.currentMinigame = MINIGAME_SUDOKU;
     }
 }
 
@@ -326,7 +333,17 @@ void initiateMining(GameState& state) {
     state.minigameActive = true;
     state.phase = PHASE_MINIGAME;
 
-    std::string gameName = (state.currentMinigame == MINIGAME_WORDLE) ? "Wordle" : "Minesweeper";
+    std::string gameName =
+        (state.currentMinigame == MINIGAME_WORDLE)
+            ? "Wordle"
+        : (state.currentMinigame == MINIGAME_MINESWEEPER)
+            ? "Minesweeper"
+        : (state.currentMinigame == MINIGAME_TWENTYFOUR)
+            ? "24 Game"
+        : (state.currentMinigame == MINIGAME_SUDOKU)
+            ? "Sudoku"
+            : "Wordle";
+
     state.lastMessage = "Mining challenge: " + gameName + "!";
 }
 
