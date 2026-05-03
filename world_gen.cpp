@@ -3,10 +3,9 @@
 // TermiCraft — World Generation Module Implementation
 //
 // Generates the 200×80 world with three biomes:
-//   Forest (cols 0–49)   — gentle rolling terrain, dense trees, ores below
+//   Forest (cols 0–49)   — dramatic hilly terrain, dense trees, ores below
 //   Cave   (cols 50–139) — sparse surface, massive winding cave with branches
-//   Light Cave (cols 140–199) — underground cavern that looks like outdoors,
-//                               with sky ceiling, grassy hills, dragon portal
+//   Light Cave (cols 140–199) — underground cavern with dragon portal
 //
 // All randomness uses a deterministic hash seeded by state.seed so that
 // the same seed always produces the same world.
@@ -16,7 +15,10 @@
 // =============================================================================
 
 #include "world_gen.h"
+#include <algorithm>
 #include <cstring>
+#include <cmath>   // for sqrtf / normal-distribution approximation
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Deterministic hash — replaces rand() everywhere
@@ -39,10 +41,29 @@ static int hashPercent2(unsigned int seed, int col, int row) {
 }
 
 // ---------------------------------------------------------------------------
+// Normal-distribution trunk height (mean=5, clamped to [3,8])
+// Uses the sum of 6 uniform [0,1] samples ≈ normal (central limit theorem).
+// Returns an int in [3, 8].
+// ---------------------------------------------------------------------------
+static int normalTrunkHeight(unsigned int seed, int col) {
+    // Sum 6 values in [0,5] → range [0,30], mean ~15, sd ~3.5
+    int sum = 0;
+    for (int i = 0; i < 6; i++) {
+        sum += (int)(worldHash(seed, col * 7 + i, 9999) % 6);
+    }
+    // Map [0,30] → mean=5, clamp [3,8]:
+    //   sum=15 → 5,  sum=0 → ~2,  sum=30 → ~8
+    int h = 3 + (sum * 5) / 30;   // linear map: 0→3, 30→8
+    if (h < 3) h = 3;
+    if (h > 8) h = 8;
+    return h;
+}
+
+// ---------------------------------------------------------------------------
 // initWorld — allocate the 2-D Block array
 // ---------------------------------------------------------------------------
 void initWorld(GameState& state) {
-    state.worldWidth  = WORLD_WIDTH;
+    state.worldWidth  = (state.viewportWidth > 0) ? state.viewportWidth : WORLD_WIDTH;
     state.worldHeight = WORLD_HEIGHT;
 
     state.world = new Block*[state.worldHeight];
@@ -55,81 +76,91 @@ void initWorld(GameState& state) {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// Clamp an int to [lo, hi]
 static int clamp(int v, int lo, int hi) {
     if (v < lo) return lo;
     if (v > hi) return hi;
     return v;
 }
 
-// Generate a gentle surface heightmap for the above-ground terrain.
-// Returns the grass row for each column (the row where BLOCK_GRASS goes).
-static void buildSurfaceHeightmap(unsigned int seed, int* heightmap) {
-    // Forest (0–49): gentle hills, base around row 8
-    heightmap[0] = SURFACE_LEVEL;
-    for (int x = 1; x < 50; x++) {
-        int r = hashPercent(seed, x, 9999) % 5; // 0-4
-        int delta = 0;
-        if (r == 0)      delta = -1;  // 20% go up
-        else if (r == 1) delta =  1;  // 20% go down
-        // else stay same                60% stay
+// ---------------------------------------------------------------------------
+// Smooth noise helpers
+// ---------------------------------------------------------------------------
 
-        // Only shift every 3-4 columns for smooth terrain
-        if (x % 3 != 0) delta = 0;
+static float smoothNoiseWG(unsigned int seed, float x) {
+    int ix = (int)x;
+    if (x < 0.0f) ix--;
+    float frac = x - (float)ix;
+    float t = frac * frac * (3.0f - 2.0f * frac); // smoothstep
+    float a = (float)(worldHash(seed, ix,     0) % 1000) / 1000.0f;
+    float b = (float)(worldHash(seed, ix + 1, 0) % 1000) / 1000.0f;
+    return a + t * (b - a);
+}
 
-        heightmap[x] = clamp(heightmap[x - 1] + delta,
-                             SURFACE_LEVEL - 2,   // row 6 min
-                             SURFACE_LEVEL + 1);   // row 9 max
-    }
+// Three-octave noise — same as demo.cpp's terrainHeight()
+static float terrainHeightWG(unsigned int seed, int x) {
+    float h = 0.0f;
+    h += smoothNoiseWG(seed,       x * 0.02f) * 6.0f;
+    h += smoothNoiseWG(seed + 100, x * 0.05f) * 3.0f;
+    h += smoothNoiseWG(seed + 200, x * 0.10f) * 1.5f;
+    return h; // range roughly 0–10.5
+}
 
-    // Cave biome surface (50–139): similar gentle terrain
-    heightmap[50] = SURFACE_LEVEL;
-    for (int x = 51; x < 140; x++) {
-        int r = hashPercent(seed, x, 9998) % 5;
-        int delta = 0;
-        if (r == 0)      delta = -1;
-        else if (r == 1) delta =  1;
-        if (x % 4 != 0) delta = 0;
+// ---------------------------------------------------------------------------
+// buildSurfaceHeightmap
+// Forest:    dramatic hills — multiplier 1.2, clamp [-6, +4] from SURFACE_LEVEL
+// Cave:      moderate hills — multiplier 0.5, clamp [-2, +2]
+// LightCave: gentle         — multiplier 0.3, clamp [-1, +2]
+// ---------------------------------------------------------------------------
+static void buildSurfaceHeightmap(unsigned int seed, int* heightmap, int worldW,
+                                  int forestEnd, int caveEnd) {
+    for (int x = 0; x < worldW; x++) {
+        float baseH = terrainHeightWG(seed, x);
 
-        heightmap[x] = clamp(heightmap[x - 1] + delta,
-                             SURFACE_LEVEL - 1,
-                             SURFACE_LEVEL + 1);
-    }
-
-    // Light Cave surface (140–199): same as cave biome surface
-    heightmap[140] = heightmap[139];
-    for (int x = 141; x < 200; x++) {
-        int r = hashPercent(seed, x, 9997) % 5;
-        int delta = 0;
-        if (r == 0)      delta = -1;
-        else if (r == 1) delta =  1;
-        if (x % 4 != 0) delta = 0;
-
-        heightmap[x] = clamp(heightmap[x - 1] + delta,
-                             SURFACE_LEVEL - 1,
-                             SURFACE_LEVEL + 1);
+        if (x <= forestEnd) {
+            // Forest — dramatic rolling hills matching the demo screenshot
+            // baseH is [0..10.5]; multiply by 1.2 gives [0..12.6], offset by -5
+            int offset = (int)(baseH * 1.2f) - 5;
+            heightmap[x] = clamp(SURFACE_LEVEL + offset, SURFACE_LEVEL - 6, SURFACE_LEVEL + 4);
+        } else if (x <= caveEnd) {
+            // Cave biome — moderate hills
+            int offset = (int)(baseH * 0.5f) - 1;
+            heightmap[x] = clamp(SURFACE_LEVEL + offset, SURFACE_LEVEL - 2, SURFACE_LEVEL + 2);
+        } else {
+            // Light cave surface — gentle
+            int offset = (int)(baseH * 0.3f);
+            heightmap[x] = clamp(SURFACE_LEVEL + offset, SURFACE_LEVEL - 1, SURFACE_LEVEL + 2);
+        }
     }
 }
 
-// Place a tree rooted at (grassRow-1, col).  Returns true if placed.
-// trunkHeight = how many BLOCK_WOOD cells (4 for surface, 2-3 for cave/light)
-// Checks bounds and 2-col spacing via lastTreeCol.
+// ---------------------------------------------------------------------------
+// placeTree
+//
+// Trunk: cells from (grassRow-1) up to (grassRow-trunkHeight) are BLOCK_WOOD.
+// Canopy: diamond pattern abs(dx)+abs(dy)<=3, dx in [-2,2], dy in [-2,0],
+//         anchored at topY = grassRow - trunkHeight (the TOP trunk cell).
+//         This puts leaves AROUND the top trunk cell — so the trunk pokes
+//         through the canopy center, giving the look:
+//
+//           ***        (dy=-2, abs(dx)<=1)
+//          *****       (dy=-1, abs(dx)<=2)
+//          **|**       (dy= 0, |=trunk, *=leaves)
+//
+// Spacing: at least 3 cols from lastTreeCol.
+// ---------------------------------------------------------------------------
 static bool placeTree(Block** world, int worldW, int worldH,
                       int col, int grassRow, int trunkHeight, int& lastTreeCol) {
-    // Spacing rule: at least 2 cols from the last tree
+    // Enforce spacing
     if (col - lastTreeCol < 3) return false;
 
-    int trunkBase = grassRow - 1;  // first wood block row (just above grass)
-    int trunkTop  = trunkBase - trunkHeight + 1;
+    int trunkTop  = grassRow - trunkHeight;  // topmost trunk row (= top of canopy centre)
+    int trunkBase = grassRow - 1;            // bottommost trunk row (one above grass)
 
-    // Leaves cap is 3×3 centered one row above trunk top
-    int leavesCenter = trunkTop - 1;
+    // Bounds: canopy reaches 2 above trunkTop and ±2 cols
+    if (trunkTop - 2 < 0) return false;
+    if (col - 2 < 0 || col + 2 >= worldW) return false;
 
-    // Bounds check
-    if (leavesCenter - 1 < 0) return false;
-    if (col - 1 < 0 || col + 1 >= worldW) return false;
-
-    // Make sure we aren't overwriting solid blocks with the trunk
+    // Verify trunk column is clear (SKY or AIR only)
     for (int y = trunkTop; y <= trunkBase; y++) {
         if (y < 0 || y >= worldH) return false;
         BlockType t = world[y][col].type;
@@ -141,12 +172,16 @@ static bool placeTree(Block** world, int worldW, int worldH,
         world[y][col].type = BLOCK_WOOD;
     }
 
-    // Place 3×3 leaves cap
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
+    // Canopy: diamond centred on trunkTop (the top trunk cell)
+    //   dy ranges -2..0  (canopy sits above and level with trunk top)
+    //   abs(dx)+abs(dy) <= 3
+    for (int dy = -2; dy <= 0; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+            if (abs(dx) + abs(dy) > 3) continue;
             int lx = col + dx;
-            int ly = leavesCenter + dy;
+            int ly = trunkTop + dy;
             if (lx < 0 || lx >= worldW || ly < 0 || ly >= worldH) continue;
+            // Only overwrite sky/air — don't clobber other trunks
             BlockType t = world[ly][lx].type;
             if (t == BLOCK_AIR || t == BLOCK_SKY) {
                 world[ly][lx].type = BLOCK_LEAVES;
@@ -158,32 +193,41 @@ static bool placeTree(Block** world, int worldW, int worldH,
     return true;
 }
 
-// Determine ore type for a given cell (diamond > gold > iron).
-// Returns the block type, or BLOCK_STONE if no ore.
+// ---------------------------------------------------------------------------
+// pickOre — determine ore type for a stone cell
+// ---------------------------------------------------------------------------
 static BlockType pickOre(unsigned int seed, int col, int row) {
-    if (row >= 50) { // DIAMOND_LEVEL
+    if (row >= 50) {
         int r = hashPercent(seed, col, row);
-        if (r < 2) return BLOCK_DIAMOND;  // 2%
+        if (r < 2) return BLOCK_DIAMOND;
     }
-    if (row >= 30) { // GOLD_LEVEL
+    if (row >= 30) {
         int r = hashPercent2(seed, col, row);
-        if (r < 3) return BLOCK_GOLD;     // 3%
+        if (r < 3) return BLOCK_GOLD;
     }
-    if (row >= 12) { // STONE_LEVEL
+    if (row >= 12) {
         int r = hashPercent(seed, col + 5000, row + 5000);
-        if (r < 15) return BLOCK_IRON;    // 15%
+        if (r < 15) return BLOCK_IRON;
     }
     return BLOCK_STONE;
 }
 
 // ---------------------------------------------------------------------------
-// generateWorld — the main generation routine
+// generateWorld — main generation routine
 // ---------------------------------------------------------------------------
 void generateWorld(GameState& state) {
     unsigned int seed = state.seed;
     int W = state.worldWidth;
     int H = state.worldHeight;
     Block** world = state.world;
+
+    if (W <= 0 || H <= 0 || world == nullptr) return;
+
+    int forestEnd = clamp((W * 25) / 100 - 1, 0, W - 1);
+    int caveEnd = clamp(forestEnd + (W * 45) / 100, forestEnd + 1, W - 1);
+    int caveStart = forestEnd + 1;
+    int lightStart = caveEnd + 1;
+    int lightEnd = W - 1;
 
     // --------------------------------------------------
     // STEP 0: Default everything to BLOCK_STONE, hidden
@@ -199,11 +243,11 @@ void generateWorld(GameState& state) {
     // --------------------------------------------------
     // STEP 1: Build surface heightmap
     // --------------------------------------------------
-    int heightmap[WORLD_WIDTH];
-    buildSurfaceHeightmap(seed, heightmap);
+    std::vector<int> heightmap(W, SURFACE_LEVEL);
+    buildSurfaceHeightmap(seed, heightmap.data(), W, forestEnd, caveEnd);
 
     // --------------------------------------------------
-    // STEP 2: Fill sky, grass, dirt for all columns
+    // STEP 2: Fill sky, grass, dirt, stone+ores for all columns
     // --------------------------------------------------
     for (int x = 0; x < W; x++) {
         int grassRow = heightmap[x];
@@ -214,93 +258,121 @@ void generateWorld(GameState& state) {
         }
 
         // Grass
-        world[grassRow][x].type = BLOCK_GRASS;
+        if (grassRow >= 0 && grassRow < H)
+            world[grassRow][x].type = BLOCK_GRASS;
 
-        // Dirt below grass (3 rows)
-        for (int y = grassRow + 1; y < grassRow + 4 && y < H; y++) {
-            if (y < 12) { // only dirt above stone level
+        // Dirt below grass (variable depth 3-5, only above stone level)
+        int dirtDepth = 3 + (int)(worldHash(seed, x, 8910) % 3);
+        for (int y = grassRow + 1; y < grassRow + 1 + dirtDepth && y < H; y++) {
+            if (y < STONE_LEVEL)
                 world[y][x].type = BLOCK_DIRT;
-            }
         }
 
-        // Stone + ores from STONE_LEVEL downward
-        for (int y = 12; y < H - 1; y++) { // leave row 79 for bedrock
-            // If it was already set to dirt, skip
-            if (world[y][x].type == BLOCK_DIRT) continue;
+        // Stone + ores from STONE_LEVEL down (bedrock at H-1)
+        for (int y = STONE_LEVEL; y < H - 1; y++) {
+            if (world[y][x].type == BLOCK_DIRT) continue; // already set
             world[y][x].type = pickOre(seed, x, y);
         }
 
-        // Bedrock at bottom
+        // Bedrock
         world[H - 1][x].type = BLOCK_BEDROCK;
     }
 
     // --------------------------------------------------
-    // STEP 3: Visibility — rows 0 through max surface level visible
+    // STEP 3: Surface visibility — reveal sky + terrain rows
+    //
+    // Mark the sky and every surface row visible so the player sees the
+    // full hillscape without fog immediately on spawn.
+    // We scan each column and mark everything from y=0 down to
+    // (grassRow + 2) visible, giving a thin slice of exposed dirt.
     // --------------------------------------------------
-    int maxSurface = SURFACE_LEVEL + 2; // a bit below the lowest grass
-    for (int y = 0; y <= maxSurface; y++) {
-        for (int x = 0; x < W; x++) {
+    for (int x = 0; x < W; x++) {
+        int grassRow = heightmap[x];
+        int revealTo = clamp(grassRow + 2, 0, H - 1);
+        for (int y = 0; y <= revealTo; y++) {
             world[y][x].visible = true;
         }
     }
 
     // --------------------------------------------------
-    // STEP 4: Trees — Forest (20%), Cave surface (10%), Light Cave surface (10%)
+    // STEP 4: Trees
+    //
+    // Forest (0-49):    ~20% chance, trunk height normal(mean=5) [3,8]
+    // Cave   (50-139):  ~10% chance, trunk height normal(mean=4) [3,6]
+    // LightCave(140-199):~5% chance, trunk height normal(mean=3) [2,4]
     // --------------------------------------------------
     {
         int lastTree = -10;
 
-        // Forest trees (20%)
-        for (int x = 0; x < 50; x++) {
+        // Forest trees
+        // Guarantee at least one tree near the left edge (cols 2-6) if possible.
+        bool leftTreePlaced = false;
+        int leftStart = 2;
+        int leftEnd = std::min(forestEnd, 6);
+        for (int x = leftStart; x <= leftEnd && !leftTreePlaced; x++) {
+            int grassRow = heightmap[x];
+            int trunkH = normalTrunkHeight(seed, x);
+            if (placeTree(world, W, H, x, grassRow, trunkH, lastTree)) {
+                leftTreePlaced = true;
+            }
+        }
+
+        for (int x = leftStart; x <= forestEnd; x++) {
             int grassRow = heightmap[x];
             int chance = hashPercent(seed, x, 8888);
             if (chance < 20) {
-                placeTree(world, W, H, x, grassRow, 4, lastTree);
+                int trunkH = normalTrunkHeight(seed, x);
+                placeTree(world, W, H, x, grassRow, trunkH, lastTree);
             }
         }
 
-        // Cave biome surface trees (10%)
-        lastTree = 47; // reset spacing for new biome
-        for (int x = 50; x < 140; x++) {
+        // Cave biome surface trees
+        lastTree = forestEnd - 2;
+        for (int x = caveStart; x <= caveEnd; x++) {
             int grassRow = heightmap[x];
             int chance = hashPercent(seed, x, 8888);
             if (chance < 10) {
-                placeTree(world, W, H, x, grassRow, 4, lastTree);
+                // Shorter mean (4) for cave biome
+                int raw = 0;
+                for (int i = 0; i < 6; i++)
+                    raw += (int)(worldHash(seed, x * 7 + i, 9999) % 5);
+                int trunkH = clamp(2 + (raw * 4) / 30, 2, 6);
+                placeTree(world, W, H, x, grassRow, trunkH, lastTree);
             }
         }
 
-        // Light Cave surface trees (10%)
-        lastTree = 137;
-        for (int x = 140; x < 200; x++) {
+        // Light Cave surface trees
+        lastTree = caveEnd - 2;
+        for (int x = lightStart; x < W; x++) {
             int grassRow = heightmap[x];
-            int chance = hashPercent(seed, x, 8888);
-            if (chance < 10) {
-                placeTree(world, W, H, x, grassRow, 4, lastTree);
+            int chance = hashPercent(seed, x, 7000);
+            if (chance < 5) {
+                int raw = 0;
+                for (int i = 0; i < 4; i++)
+                    raw += (int)(worldHash(seed, x * 5 + i, 7001) % 3);
+                int trunkH = clamp(2 + (raw * 2) / 12, 2, 4);
+                placeTree(world, W, H, x, grassRow, trunkH, lastTree);
             }
         }
     }
 
     // --------------------------------------------------
     // STEP 5: Main cave tunnel (Cave biome, cols 50–139)
-    // Enters at ~col 50, row 20.  Exits at ~col 139, row 45.
     // --------------------------------------------------
-    int cavePath[200]; // center row of cave at each column
-    memset(cavePath, 0, sizeof(cavePath));
+    std::vector<int> cavePath(W, 0);
 
     {
-        int centerY = 20; // start row
-        int targetY = 45; // end row at col 139
+        int centerY = 20;
+        int targetY = 45;
 
-        for (int x = 50; x <= 139; x++) {
+        for (int x = caveStart; x <= caveEnd; x++) {
             cavePath[x] = centerY;
 
-            // Every 4 columns, shift center toward the exit row
-            if ((x - 50) % 4 == 0 && x < 139) {
+            if ((x - caveStart) % 4 == 0 && x < caveEnd) {
                 int r = hashPercent(seed, x, 7777) % 5;
-                int delta = r - 2; // -2, -1, 0, +1, +2
+                int delta = r - 2;
 
-                // Bias toward targetY
-                float progress = (float)(x - 50) / 89.0f;
+                float progress = (float)(x - caveStart) / (float)(caveEnd - caveStart + 1);
                 int ideal = 20 + (int)(progress * (targetY - 20));
                 if (centerY < ideal - 2) delta = clamp(delta, 0, 2);
                 if (centerY > ideal + 2) delta = clamp(delta, -2, 0);
@@ -309,17 +381,13 @@ void generateWorld(GameState& state) {
             }
         }
 
-        // Carve the main tunnel: 6 wide, 5 tall
-        for (int x = 50; x <= 139; x++) {
+        // Carve main tunnel: 6 wide, 5 tall
+        for (int x = caveStart; x <= caveEnd; x++) {
             int cy = cavePath[x];
             int halfW = 3;
             int halfH = 2;
 
-            // Widen entrance at cols 50–53
-            if (x <= 53) {
-                halfH = 4; // 8 tiles tall
-                halfW = 4;
-            }
+            if (x <= caveStart + 3) { halfH = 4; halfW = 4; } // wide entrance
 
             for (int dy = -halfH; dy <= halfH; dy++) {
                 for (int dx = -halfW; dx <= halfW; dx++) {
@@ -332,14 +400,13 @@ void generateWorld(GameState& state) {
             }
         }
 
-        // Add floor surfaces inside the cave (grass on stone below air)
-        for (int x = 50; x <= 139; x++) {
+        // Cave floor grass
+        for (int x = caveStart; x <= caveEnd; x++) {
             int cy = cavePath[x];
-            int floorY = cy + 3; // bottom of the 5-tall tunnel
+            int floorY = cy + 3;
             if (floorY >= 0 && floorY < H - 1) {
-                // If below is stone and above is air, place grass
                 if (world[floorY][x].type == BLOCK_STONE ||
-                    world[floorY][x].type == BLOCK_IRON ||
+                    world[floorY][x].type == BLOCK_IRON  ||
                     world[floorY][x].type == BLOCK_GOLD) {
                     if (floorY - 1 >= 0 && world[floorY - 1][x].type == BLOCK_AIR) {
                         world[floorY][x].type = BLOCK_GRASS;
@@ -350,195 +417,139 @@ void generateWorld(GameState& state) {
     }
 
     // --------------------------------------------------
-    // STEP 6: Branch tunnels off the main cave (4–6 branches)
+    // STEP 6: Branch tunnels (4–6 branches off main cave)
     // --------------------------------------------------
     {
-        int numBranches = 4 + (int)(worldHash(seed, 12345, 67890) % 3); // 4-6
+        int numBranches = 4 + (int)(worldHash(seed, 12345, 67890) % 3);
 
         for (int b = 0; b < numBranches; b++) {
-            // Pick a starting column along the main cave
-            int startX = 55 + (int)(worldHash(seed, b * 137, 4444) % 80);
-            if (startX > 135) startX = 135;
+            int caveSpan = std::max(1, caveEnd - caveStart - 4);
+            int startX = caveStart + 3 + (int)(worldHash(seed, b * 137, 4444) % caveSpan);
+            if (startX > caveEnd - 3) startX = caveEnd - 3;
             int startY = cavePath[startX];
 
-            // Direction: pick from a set of diagonal/horizontal directions
             int dirSeed = (int)(worldHash(seed, b * 271, 5555) % 4);
             int bdx, bdy;
             switch (dirSeed) {
-                case 0: bdx =  1; bdy = -1; break; // up-right
-                case 1: bdx =  1; bdy =  1; break; // down-right
-                case 2: bdx = -1; bdy = -1; break; // up-left
-                case 3: bdx = -1; bdy =  1; break; // down-left
+                case 0: bdx =  1; bdy = -1; break;
+                case 1: bdx =  1; bdy =  1; break;
+                case 2: bdx = -1; bdy = -1; break;
+                default: bdx = -1; bdy =  1; break;
             }
 
-            int branchLen = 20 + (int)(worldHash(seed, b * 311, 6666) % 11); // 20-30
+            int branchLen = 20 + (int)(worldHash(seed, b * 311, 6666) % 11);
+            int bx = startX, by = startY;
 
-            int bx = startX;
-            int by = startY;
             for (int step = 0; step < branchLen; step++) {
-                // Carve 3 wide, 2 tall
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dx = -1; dx <= 1; dx++) {
-                        int wx = bx + dx;
-                        int wy = by + dy;
-                        if (wx < 50 || wx > 139) continue; // stay in biome
+                        int wx = bx + dx, wy = by + dy;
+                        if (wx < caveStart || wx > caveEnd) continue;
                         if (wy < 1 || wy >= H - 1) continue;
                         if (world[wy][wx].type == BLOCK_BEDROCK) continue;
                         world[wy][wx].type = BLOCK_AIR;
                     }
                 }
-
                 bx += bdx;
-                by += (step % 2 == 0) ? bdy : 0; // diagonal every other step
-
-                if (bx < 50 || bx > 139 || by < 13 || by >= H - 2) break;
+                by += (step % 2 == 0) ? bdy : 0;
+                if (bx < caveStart || bx > caveEnd || by < 13 || by >= H - 2) break;
             }
         }
     }
 
     // --------------------------------------------------
-    // STEP 7: Cave underground trees (5% on cave floor grass)
-    // --------------------------------------------------
-    {
-        int lastTree = 47;
-        for (int x = 50; x <= 139; x++) {
-            if (world[cavePath[x] + 3][x].type != BLOCK_GRASS) continue;
-            int chance = hashPercent(seed, x, 6543);
-            if (chance < 5) {
-                int grassRow = cavePath[x] + 3;
-                int trunkH = 2 + (int)(worldHash(seed, x, 6544) % 2); // 2-3
-                placeTree(world, W, H, x, grassRow, trunkH, lastTree);
-            }
-        }
-    }
-
-    // --------------------------------------------------
-    // STEP 8: Light Cave (cols 140–199) — underground cavern
+    // STEP 7: Light Cave (cols 140–199)
     // --------------------------------------------------
 
-    // Carve the cavern hollow: rows 15–71 become AIR
-    for (int y = 15; y <= 71; y++) {
-        for (int x = 140; x < 200; x++) {
-            if (world[y][x].type == BLOCK_BEDROCK) continue;
-            world[y][x].type = BLOCK_AIR;
-        }
-    }
-
-    // Stone ceiling: rows 12–14 stay as stone (they already are)
-    // Stone floor shell: rows 72–74 stay as stone (they already are)
-
-    // Sky layer inside the cavern: rows 15–22
-    for (int y = 15; y <= 22; y++) {
-        for (int x = 140; x < 200; x++) {
-            world[y][x].type = BLOCK_SKY;
-        }
-    }
-
-    // Cloud clusters (3–4 clusters of 3×1 BLOCK_SKY patches in rows 16–20)
-    {
-        int numClouds = 3 + (int)(worldHash(seed, 9001, 9001) % 2);
-        for (int c = 0; c < numClouds; c++) {
-            int cx = 145 + (int)(worldHash(seed, c * 431, 9002) % 48);
-            int cy = 16 + (int)(worldHash(seed, c * 557, 9003) % 5);
-            for (int dx = 0; dx < 3; dx++) {
-                int wx = cx + dx;
-                if (wx >= 140 && wx < 200 && cy >= 15 && cy <= 22) {
-                    world[cy][wx].type = BLOCK_SKY;
-                }
-            }
-        }
-    }
-
-    // Hilly floor inside the cavern
-    int lightCaveFloor[200];
-    memset(lightCaveFloor, 0, sizeof(lightCaveFloor));
-    {
-        int floorY = 55; // starting height
-        for (int x = 140; x < 200; x++) {
-            lightCaveFloor[x] = floorY;
-
-            if ((x - 140) % 4 == 0 && x < 199) {
-                int r = hashPercent(seed, x, 8000) % 3;
-                int delta = r - 1; // -1, 0, +1
-                floorY = clamp(floorY + delta, 50, 62);
+    // Hollow out rows 20-65
+    std::vector<int> lightCaveFloor(W, 0);
+    if (lightStart < W) {
+        // Hollow out rows 20-65
+        for (int y = 20; y <= 65; y++) {
+            for (int x = lightStart; x < W; x++) {
+                if (world[y][x].type == BLOCK_BEDROCK) continue;
+                world[y][x].type = BLOCK_AIR;
             }
         }
 
-        // Place grass, dirt, stone for the hills
-        for (int x = 140; x < 200; x++) {
-            int gy = lightCaveFloor[x];
-
-            // Grass at the top
-            world[gy][x].type = BLOCK_GRASS;
-
-            // Dirt for 3 rows below
-            for (int d = 1; d <= 3; d++) {
-                if (gy + d < 72) {
-                    world[gy + d][x].type = BLOCK_DIRT;
+        // Hilly floor
+        {
+            int floorY = 50;
+            for (int x = lightStart; x < W; x++) {
+                lightCaveFloor[x] = floorY;
+                if ((x - lightStart) % 4 == 0 && x < W - 1) {
+                    int r = hashPercent(seed, x, 8000) % 3;
+                    int delta = r - 1;
+                    floorY = clamp(floorY + delta, 46, 57);
                 }
             }
 
-            // Stone below dirt to row 71
-            for (int y = gy + 4; y <= 71; y++) {
-                world[y][x].type = BLOCK_STONE;
-            }
-        }
-    }
-
-    // Trees on the Light Cave floor (5%)
-    {
-        int lastTree = 137;
-        for (int x = 140; x < 200; x++) {
-            int gy = lightCaveFloor[x];
-            int chance = hashPercent(seed, x, 7000);
-            if (chance < 5) {
-                int trunkH = 2 + (int)(worldHash(seed, x, 7001) % 2); // 2-3
-                placeTree(world, W, H, x, gy, trunkH, lastTree);
-            }
-        }
-    }
-
-    // Dragon portal at column 170, centered on local floor height
-    {
-        int portalCol = 170;
-        int floorRow  = lightCaveFloor[portalCol];
-
-        // 3 wide × 4 tall portal, bottom sits on the grass row
-        int portalTop = floorRow - 4;
-        for (int dy = 0; dy < 4; dy++) {
-            for (int dx = 0; dx < 3; dx++) {
-                int px = portalCol + dx;
-                int py = portalTop + dy + 1; // +1 so bottom row = floorRow
-                if (px >= 0 && px < W && py >= 0 && py < H) {
-                    world[py][px].type = BLOCK_DRAGON_CAVE;
+            for (int x = lightStart; x < W; x++) {
+                int gy = lightCaveFloor[x];
+                world[gy][x].type = BLOCK_GRASS;
+                for (int d = 1; d <= 3; d++) {
+                    if (gy + d < 65) world[gy + d][x].type = BLOCK_DIRT;
+                }
+                for (int y = gy + 4; y <= 65; y++) {
+                    world[y][x].type = BLOCK_STONE;
                 }
             }
         }
 
-        // Clear tile in front of the portal (col 169, floor row)
-        if (portalCol - 1 >= 0) {
-            world[floorRow][portalCol - 1].type = BLOCK_AIR;
-            // Also clear a couple tiles above for walking clearance
-            if (floorRow - 1 >= 0) world[floorRow - 1][portalCol - 1].type = BLOCK_AIR;
-            if (floorRow - 2 >= 0) world[floorRow - 2][portalCol - 1].type = BLOCK_AIR;
+        // Light Cave floor trees (5%)
+        {
+            int lastTree = caveEnd - 2;
+            for (int x = lightStart; x < W; x++) {
+                int gy = lightCaveFloor[x];
+                int chance = hashPercent(seed, x, 7000);
+                if (chance < 5) {
+                    int raw = 0;
+                    for (int i = 0; i < 4; i++)
+                        raw += (int)(worldHash(seed, x * 5 + i, 7001) % 3);
+                    int trunkH = clamp(2 + (raw * 2) / 12, 2, 4);
+                    placeTree(world, W, H, x, gy, trunkH, lastTree);
+                }
+            }
+        }
+
+        // Dragon portal centered in the light cave
+        {
+            int portalCol = clamp(lightStart + (lightEnd - lightStart) / 2, lightStart, lightEnd);
+            int floorRow  = lightCaveFloor[portalCol];
+            int portalTop = floorRow - 4;
+
+            for (int dy = 0; dy < 4; dy++) {
+                for (int dx = 0; dx < 3; dx++) {
+                    int px2 = portalCol + dx;
+                    int py2 = portalTop + dy + 1;
+                    if (px2 >= 0 && px2 < W && py2 >= 0 && py2 < H)
+                        world[py2][px2].type = BLOCK_DRAGON_CAVE;
+                }
+            }
+
+            if (portalCol - 1 >= 0) {
+                world[floorRow][portalCol - 1].type = BLOCK_AIR;
+                if (floorRow - 1 >= 0) world[floorRow - 1][portalCol - 1].type = BLOCK_AIR;
+                if (floorRow - 2 >= 0) world[floorRow - 2][portalCol - 1].type = BLOCK_AIR;
+            }
         }
     }
 
     // --------------------------------------------------
-    // STEP 9: Connect main cave to Light Cave
-    // The main cave exits at ~col 139, row cavePath[139].
-    // Carve a passage from col 139 to col 142, matching heights.
+    // STEP 8: Connect main cave → Light Cave (cols 134-148)
     // --------------------------------------------------
-    {
-        int exitY = cavePath[139];
-        int entryY = 40; // roughly mid-cavern, above the hills
+    if (lightStart < W) {
+        int exitY  = cavePath[caveEnd];
+        int entryY = 40;
 
-        // Smooth transition from exit to Light Cave interior
-        for (int x = 137; x <= 145; x++) {
-            float t = (float)(x - 137) / 8.0f;
+        int bridgeStart = clamp(caveEnd - 2, 0, W - 1);
+        int bridgeEnd = clamp(lightStart + 3, 0, W - 1);
+        int span = std::max(1, bridgeEnd - bridgeStart);
+
+        for (int x = bridgeStart; x <= bridgeEnd; x++) {
+            float t = (float)(x - bridgeStart) / (float)span;
             int cy = exitY + (int)(t * (entryY - exitY));
-
-            for (int dy = -3; dy <= 3; dy++) {
+            for (int dy = -4; dy <= 4; dy++) {
                 int wy = cy + dy;
                 if (wy < 1 || wy >= H - 1) continue;
                 if (x < 0 || x >= W) continue;
@@ -549,27 +560,26 @@ void generateWorld(GameState& state) {
     }
 
     // --------------------------------------------------
-    // STEP 10: Forest cave entrance visible from surface
-    // Carve a gentle slope from the forest surface down to the cave entrance
-    // at col 50, row 20.  This makes the cave mouth visible.
+    // STEP 9: Forest cave entrance slope (cols 45-53)
     // --------------------------------------------------
     {
-        int surfaceY = heightmap[49]; // grass row at forest edge
-        int caveEntryY = cavePath[50];
+        int surfaceY   = heightmap[forestEnd];
+        int caveEntryY = cavePath[caveStart];
 
-        // Slope from col 45 to col 53
-        for (int x = 45; x <= 53; x++) {
-            float t = (float)(x - 45) / 8.0f;
+        int slopeStart = clamp(caveStart - 5, 0, W - 1);
+        int slopeEnd = clamp(caveStart + 3, 0, W - 1);
+        int span = std::max(1, slopeEnd - slopeStart);
+
+        for (int x = slopeStart; x <= slopeEnd; x++) {
+            float t = (float)(x - slopeStart) / (float)span;
             int cy = surfaceY + (int)(t * (caveEntryY - surfaceY));
-
-            int halfH = 2 + (int)(t * 2); // gets taller as we go deeper
+            int halfH = 2 + (int)(t * 2);
             for (int dy = -halfH; dy <= halfH; dy++) {
                 int wy = cy + dy;
                 if (wy < 1 || wy >= H - 1) continue;
                 if (x < 0 || x >= W) continue;
                 if (world[wy][x].type == BLOCK_BEDROCK) continue;
-                // Don't carve through the sky/surface layer too aggressively
-                if (wy < surfaceY - 1 && x < 48) continue;
+                if (wy < surfaceY - 1 && x < caveStart - 2) continue;
                 world[wy][x].type = BLOCK_AIR;
             }
         }

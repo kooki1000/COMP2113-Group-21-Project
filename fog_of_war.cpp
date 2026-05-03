@@ -99,8 +99,8 @@ static int appendHUD(char* buf, int pos, const GameState& state,
     }
     pos += sprintf(buf + pos, "] %d/%d", state.player.health, state.player.maxHealth);
 
-    // ⭐ score  (U+2B50 = \xe2\xad\x90)
-    pos += sprintf(buf + pos, "  \033[0;33m\xe2\xad\x90 %d\033[0m", state.score);
+    // score
+    pos += sprintf(buf + pos, "  \033[0;33mPTS:%d\033[0m", state.score);
 
     // ⛏ pickaxe  (U+26CF = \xe2\x9b\x8f)
     pos += sprintf(buf + pos, "  %s\xe2\x9b\x8f %s\033[0m",
@@ -171,10 +171,10 @@ static int appendHUD(char* buf, int pos, const GameState& state,
 void renderWorld(const GameState& state, const std::string& statusMsg) {
     int pos = 0;
 
-    // Cursor home (overwrite in place, no scroll)
-    const char* home = "\033[H";
-    memcpy(renderBuf + pos, home, 3);
-    pos += 3;
+    // Hide cursor + cursor home (overwrite in place, no scroll)
+    const char* home = "\033[?25l\033[H";
+    memcpy(renderBuf + pos, home, 9);
+    pos += 9;
 
     int camX = state.camera.x;
     int camY = state.camera.y;
@@ -207,14 +207,19 @@ void renderWorld(const GameState& state, const std::string& statusMsg) {
             // Out of bounds
             if (wx < 0 || wx >= state.worldWidth ||
                 wy < 0 || wy >= state.worldHeight) {
-                renderBuf[pos++] = ' ';
+                if (wy >= 0 && wy <= SURFACE_LEVEL + 1)
+                    pos += renderSkyCell(wy, vx, vpW, renderBuf + pos);
+                else
+                    pos += sprintf(renderBuf + pos, "\033[40m \033[0m");
                 continue;
             }
 
             const Block& b = state.world[wy][wx];
 
-            // Sky cells — delegate to day_night module
-            if (wy < SURFACE_LEVEL && (b.type == BLOCK_SKY || b.type == BLOCK_AIR)) {
+            // Sky cells — delegate to day_night module.
+            // Check block type first (not row) so the light cave's internal
+            // sky rows and any terrain-dip sky at row >= SURFACE_LEVEL all render.
+            if (b.type == BLOCK_SKY || (wy <= SURFACE_LEVEL && b.type == BLOCK_AIR)) {
                 pos += renderSkyCell(wy, vx, vpW, renderBuf + pos);
                 continue;
             }
