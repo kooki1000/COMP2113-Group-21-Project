@@ -1,8 +1,27 @@
-/*
- * menu.cpp
- *SHEIKH SAARIM
- * All the UI screens and menus.
- */
+// =============================================================================
+// menu.cpp
+// TermiCraft — UI Screens & HUD Implementation
+//
+// Every screen the player sees outside the actual game world is here.
+// the animated main menu, difficulty picker, how-to-play, high score board,
+// game over splash, and win screen. Also has the in-game HUD (health bar,
+// inventory counts, depth indicator) and a handful of terminal utilities
+// shared across all other modules.
+//
+// Key functions:
+//   - showMainMenu()       Animated title + option selection loop.
+//   - selectDifficulty()   Card-style difficulty picker (Easy / Normal / Hard).
+//   - showHighScores()     Ranked leaderboard loaded from disk.
+//   - showHowToPlay()      Controls and mechanics reference screen.
+//   - showGameOver()       Death splash with final stats.
+//   - showWinScreen()      Victory screen (only reached after beating the dragon).
+//   - drawHUD()            In-game status bar — HP, score, gear, direction, depth.
+//   - getch()              Single-keypress helper (no Enter needed).
+//   - hpad()               Returns a padding string to horizontally center content.
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: menu.h, types.h, colors.h
+// =============================================================================
 
 #include "menu.h"
 #include "colors.h"
