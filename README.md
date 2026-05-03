@@ -7,6 +7,7 @@
 | Sohan | 3036636025 | Boss fight, score system |
 | Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation |
 | Koki | 3036505795 | Player controller, mining system, crafting system |
+| Nan | 3036475225 | Minesweeper implementation, Twentyfour implementation |
 
 ---
 
@@ -187,3 +188,41 @@ An advanced logic-based minigame used for unlocking high-tier rewards. The game 
     - **Easy/Normal:** 6x6 grid with 2x3 subgrids.
     - **Hard:** 9x9 grid with 3x3 subgrids.
     The number of cells removed to create the puzzle is dynamically adjusted based on the player's chosen difficulty level.
+
+---
+
+### Minesweeper Minigame ('minesweeper.cpp')
+
+A classic logic-based minigame triggered when players try to mine ores. The game dynamically generates a solvable minefield using random placement and provides real-time feedback through an ASCII board with numbered hints on adjacent mines, flagging, and flood-fill reveal mechanics. Players interact with the puzzle by typing an action (F - flag, R - reveal, Q - quit) and corresponding x y coordinates of the cell. 
+
+**How coding elements are met:**
+- **Random events (Element 1):** Puzzle generation uses srand() seeded with current time and random mine placement to ensure every board is unique and fair. The number and positions of mines vary each playthrough.
+
+- **Storing data (Element 2):** Board states are managed with three parallel 2D std::vector<std::vector<...>> grids (mineGrid, solutionGrid, and revealedGrid). High scores (time + player name) are stored persistently using file I/O in showHighScore() / saveHighScore(), allowing leaderboard persistence across game sessions.
+
+- **Dynamic memory management (Element 3):** All board grids are allocated dynamically at runtime using std::vector with sizes determined by the chosen difficulty. Memory is automatically managed by the vector destructors when the Minesweeper object goes out of scope, preventing leaks even on early game exit.
+
+- **Multiple difficulty levels (Element 6):** Difficulty is scaled by changing grid size and mine number:
+    - **Easy:** 6x6 grid with 7 mines 
+    - **Medium:** 8x8 grid with 12 mines
+    - **Hard:** 10x10 grid with 20 mines
+---
+### Twentyfour Minigame ('twentyfour.cpp', 'evaluator.cpp')
+
+A logic and arithmetic-based minigame used during equipment progression in TermiCraft. The player receives four cards and must use each value exactly once with +, -, *, / and parentheses to reach exactly 24.
+
+**How coding elements are met:**
+- **Random events (Element 1):** Puzzle selection uses rand() seeded with current time to pick a random valid 4-number puzzle from the bank each time, ensuring every session feels unique.
+
+- **Storing data (Element 2):**
+
+- **Dynamic memory management (Element 3):** All puzzle storage and card vectors are allocated dynamically with std::vector. Memory is automatically cleaned up when the TwentyFour object is destroyed.
+
+- **File input (Element 4):** loadPuzzleNumbers() and parseNumbers() read and parse the twentyfourpuzzles.csv file, skipping the header and parsing the puzzle to be in an easy-to-process format.
+
+- **Program codes in multiple files (Element 5):** Core game logic is in twentyfour.cpp / twentyfour.h, while expression parsing and evaluation are separated into evaluator.cpp / evaluator.h for clean modularity.
+
+- **Multiple difficulty levels (Elemen 6):** Difficulty is controlled by attempts and timeLimit parameters passed to playGame():
+    - **Easy:** 5 attempts, 180 seconds
+    - **Medium:** 3 attempts, 90 seconds
+    - **Hard:** 1 attempt, 30 seconds
