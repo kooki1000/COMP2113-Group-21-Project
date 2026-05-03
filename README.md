@@ -706,54 +706,136 @@ on Linux and require no additional installation:
 
 Terminal rendering uses ANSI escape codes via the team's `colors.h` 
 
-### Wordle Minigame (wordle.cpp)
+### Wordle Minigame (`wordle.cpp`)
 
-A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attempts to identify a hidden word, with feedback provided via high-contrast color-coded tiles: Green (correct position), Yellow (wrong position), and Gray (not in word). The game features a live "Letters Used" keyboard tracker that updates in real-time to show the best-known status of each letter in the alphabet. This tracker is important for strategy, as it encodes global information across all previous guesses rather than just the current attempt.
+A terminal-based word deduction puzzle integrated into TermiCraft. The player must guess a hidden word within a fixed number of attempts, receiving feedback after each guess in the form of color-coded tiles. The objective is to infer the correct word using letter position logic and elimination strategy.
 
-The system is designed to behave similarly to the official Wordle game logic, including strict validation of input length, rejection of invalid words, and per-letter feedback computation that respects duplicate letter rules. The algorithm ensures correctness by marking already-used target letters to prevent over-counting yellow tiles.
+The system follows a strict evaluation model identical to the original Wordle ruleset, including duplicate-letter handling and position-sensitive scoring. Each guess is validated against a predefined dictionary list to ensure only valid words are accepted.
 
-The UI is fully terminal-rendered using ANSI escape codes from colors.h, with a structured grid layout that maintains alignment across varying word lengths. Each row is dynamically rendered based on guess history, ensuring consistent spacing and visual clarity.
+The UI is fully rendered using ANSI escape codes from `colors.h`, with a structured grid layout that redraws the full board each turn to maintain consistency and alignment. A persistent alphabet tracking system is maintained internally to accumulate knowledge of letter states across guesses.
 
-The word pool is split into three difficulty tiers (WORDS_4, WORDS_5, WORDS_6), each containing a curated dictionary of valid English words. These are used both for answer selection and guess validation, ensuring that gameplay remains constrained to meaningful vocabulary rather than arbitrary strings.
+Word selection is performed from static word lists grouped by difficulty, ensuring consistent vocabulary constraints and reproducible gameplay behavior.
 
-How coding elements are met:
+---
 
-**Random events (Element 1):** The target word is selected randomly using rand() from a predefined vector of valid words based on difficulty. This ensures that every run of the minigame produces a different hidden word, with uniform probability across the word list. The randomness is deterministic only if the same seed is reused, allowing reproducibility for debugging.
+#### How Coding Elements Are Met
 
-**Data structures (Element 2): ** Uses std::vector<std::string> for storing word banks and std::vector<int> / std::vector<bool> structures to track letter states and match evaluation. A per-guess evaluation array stores tile states (0 = gray, 1 = yellow, 2 = green), ensuring deterministic rendering. Additionally, a 26-length alphabet state array maintains cumulative letter knowledge across guesses for the on-screen keyboard.
+**Random events (Element 1):**  
+The target word is selected using `rand()` from a predefined vector of valid words corresponding to the chosen difficulty. Each execution produces a different hidden word, assuming a non-fixed seed.
 
-**Algorithmic logic: **Implements a two-pass matching algorithm identical to Wordle’s official rules:
-First pass identifies correct-position (green) matches.
-Second pass assigns partial matches (yellow) while respecting consumed letters.
-This prevents incorrect duplication of yellow tiles when letters appear multiple times.
+---
 
-**Multiple files (Element 5):** The module is fully encapsulated and integrates with colors.h for rendering and menu.h for UI consistency. It exposes a single entry point runWordle(int wordLength) that allows seamless invocation from the main game loop without exposing internal state.
+**Data structures (Element 2):**  
+- `std::vector<std::string>` for word banks and guess history  
+- A per-guess evaluation grid storing tile states  
+- A 26-element array tracking cumulative letter states (correct, present, absent)
 
-**Difficulty levels (Element 6):** Difficulty is directly mapped to word length:
-Easy: 4-letter words (high frequency vocabulary, faster solving time)
-Normal: 5-letter words (balanced difficulty and vocabulary range)
-Hard: 6-letter words (lower frequency words, higher cognitive load)
+Each guess is stored immutably and re-rendered each frame for display.
 
-This scaling affects both the solution space size and the cognitive difficulty of pattern recognition.
+---
+
+**Algorithmic logic:**  
+Evaluation uses a two-pass system:
+
+1. First pass: mark correct letter + correct position (green)
+2. Second pass: mark correct letter but wrong position (yellow), ensuring each letter in the target word is only consumed once
+
+This prevents incorrect duplicate scoring for repeated letters.
+
+---
+
+**Multiple files (Element 5):**  
+The module is encapsulated and exposed through a single entry function. It integrates with:
+- `colors.h` for ANSI rendering  
+- `menu.h` for input handling consistency  
+
+No external global state is required.
+
+---
+
+**Difficulty levels (Element 6):**  
+- Easy: 4-letter words (small vocabulary, high frequency words)  
+- Normal: 5-letter words (balanced difficulty)  
+- Hard: 6-letter words (lower frequency vocabulary, higher deduction complexity)
+
+Word length directly scales the entropy of the solution space.
+
+---
 
 ---
 
 ### Sudoku Minigame (`sudoku.cpp`)
 
-An advanced logic-based minigame used for unlocking high-tier rewards. The game dynamically generates a solvable Sudoku grid using a recursive backtracking algorithm. It features a custom board-rendering engine that distinguishes between **Fixed Numbers** and **Player Moves** using color-coded ANSI output.
+A terminal-based constraint satisfaction puzzle integrated into TermiCraft. The player completes a partially filled Sudoku grid while respecting strict row, column, and subgrid constraints.
 
-**How coding elements are met:**
+The system dynamically generates a valid Sudoku board at runtime using recursive backtracking, then removes values according to difficulty to create a playable puzzle. Each board is guaranteed to be solvable.
 
-- **Random events (Element 1):** Puzzle generation utilizes the `<random>` library’s `std::mt19937` and `std::shuffle` from `<algorithm>` to ensure every board is unique and mathematically valid.
+The rendering system uses ANSI formatting to visually separate:
+- Fixed clues (non-editable)
+- Player inputs
+- Empty cells
 
-- **Data structures (Element 2):** Board states are managed via a 2D `std::vector<std::vector<int>>`. A parallel boolean grid tracks "fixed" cells to prevent players from overwriting initial clues.
+The board is fully re-rendered after every move to maintain alignment and consistency.
 
-- **Multiple files (Element 5):** Encapsulated within a `SudokuGame` class, the module uses `<sstream>` to parse complex user input strings (`Row Col Value`) and leverages `<unistd.h>` for consistent frame timing across the project.
+---
 
-- **Difficulty levels (Element 6):** Difficulty is scaled through both grid dimensions and clue density:
-    - **Easy/Normal:** 6x6 grid with 2x3 subgrids.
-    - **Hard:** 9x9 grid with 3x3 subgrids.
-    The number of cells removed to create the puzzle is dynamically adjusted based on the player's chosen difficulty level.
+#### Board Generation
+
+1. Generate a fully valid completed Sudoku grid using backtracking
+2. Randomly shuffle candidate values for variability
+3. Remove cells based on difficulty level while preserving solvability
+
+---
+
+#### How Coding Elements Are Met
+
+**Random events (Element 1):**  
+- Backtracking solution generation combined with shuffled candidate order  
+- Randomized cell removal when creating the puzzle  
+
+Each run produces a unique valid board configuration.
+
+---
+
+**Data structures (Element 2):**  
+- `std::vector<std::vector<int>>` for the Sudoku grid  
+- `std::vector<std::vector<bool>>` mask for fixed cells  
+
+This ensures separation between immutable clues and mutable player input.
+
+---
+
+**Algorithmic logic:**  
+A move is valid only if:
+- The number is not already present in the row  
+- The number is not present in the column  
+- The number is not present in the subgrid  
+
+Subgrid size depends on difficulty (2×3 or 3×3).
+
+---
+
+**Multiple files (Element 5):**  
+The module is structured as:
+- `sudoku.h` (interface)
+- `sudoku.cpp` (implementation)
+
+It integrates with shared UI and input systems via `menu.h`.
+
+---
+
+**Difficulty levels (Element 6):**  
+- Easy / Normal:
+  - 6×6 grid  
+  - 2×3 subgrid structure  
+  - Higher clue density  
+
+- Hard:
+  - 9×9 grid  
+  - 3×3 subgrid structure  
+  - Lower clue density  
+
+Increasing difficulty reduces initial information and increases constraint complexity.
 
 ---
 
@@ -794,3 +876,5 @@ A logic and arithmetic-based minigame used during equipment progression in Termi
     - **Easy:** 5 attempts, 180 seconds
     - **Medium:** 3 attempts, 90 seconds
     - **Hard:** 1 attempt, 30 seconds
+
+
