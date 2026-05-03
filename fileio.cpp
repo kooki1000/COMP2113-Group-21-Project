@@ -1,9 +1,24 @@
-/*
- * fileio.cpp
- * SHEIKH SAARIM
- * Save/load implementation. Writes everything to text files.
- * Formatss line by line.
- */
+// =============================================================================
+// fileio.cpp
+// TermiCraft — Save, Load & High Score Persistence
+//
+// Handles everything written to and read from disk. Game saves use a plain
+// text format (one value or block per line) so they're easy to inspect and
+// debug without a binary parser. The high score file works the same way.
+// top 10 entries sorted descending, rewritten in full on every save.
+//
+// Key functions:
+//   - saveGame()          Serialises full GameState (world + player + enemies) to file.
+//   - loadGame()          Reads a save file back into GameState, reallocating the world.
+//   - addHighScore()      Appends a run result, sorts, trims to top 10, rewrites file.
+//   - loadHighScores()    Returns the current leaderboard as a vector of HighScore.
+//   - getTopHighScore()   Returns just the #1 entry (used for new-record detection).
+//   - serializeWorld()    Packs the Block grid into a compact string for storage.
+//   - deserializeWorld()  Reconstructs the Block grid from that string on load.
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: fileio.h, types.h
+// =============================================================================
 
 #include "fileio.h"
 #include <fstream>
