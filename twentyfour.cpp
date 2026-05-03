@@ -83,6 +83,7 @@ private:
     bool checkNumbersUsed(const std::string& expression, std::vector<card> numbers);
 };
 
+//Cleans puzzle from the database to be a vector of integers for easy processing
 static std::vector<int> parseNumbers(const std::string& numbersStr) {
     std::vector<int> result;
     std::string clean;
@@ -104,6 +105,7 @@ static std::vector<int> parseNumbers(const std::string& numbersStr) {
     return result;
 }
 
+//Reads puzzles from csv file
 static std::vector<std::vector<int>> loadPuzzleNumbers(const std::string& filename) {
     std::vector<std::vector<int>> puzzles;
     std::ifstream file(filename);
@@ -136,10 +138,12 @@ static std::vector<std::vector<int>> loadPuzzleNumbers(const std::string& filena
     return puzzles;
 }
 
+//Constructor
 TwentyFour::TwentyFour() : win(false), gamestate(0) {
     allPuzzles = loadPuzzleNumbers("twentyfourpuzzles.csv");
 }
 
+//Displays cards
 void TwentyFour::printCards(const std::vector<card>& cards) {
     std::string P = hpad(47);
 
@@ -187,6 +191,7 @@ void TwentyFour::printCards(const std::vector<card>& cards) {
     std::cout << "\n";
 }
 
+//Chooses a random puzzle and create card objects based on the card values and assigns a suit 
 void TwentyFour::pickCards() {
     if (allPuzzles.empty()) return;
 
@@ -209,6 +214,7 @@ void TwentyFour::pickCards() {
     }
 }
 
+//Checks if user input is a valid expression 
 bool TwentyFour::validateInput(std::string expression) {
     if (expression.empty()) {
         std::cout << hpad(35) << "Error: Please enter an expression\n";
@@ -232,6 +238,7 @@ bool TwentyFour::validateInput(std::string expression) {
     }
 }
 
+//Checks if all numbers have been used using function defined in equationevaluator.cpp
 bool TwentyFour::checkNumbersUsed(const std::string& expression, std::vector<card> cards) {
     evaluator eval;
     std::vector<int> cardValues;
@@ -243,6 +250,7 @@ bool TwentyFour::checkNumbersUsed(const std::string& expression, std::vector<car
     return eval.checkNumbersUsed(expression, cardValues);
 }
 
+//Computes the input and compared value to 24
 bool TwentyFour::evaluateInput(std::string expression) {
     evaluator eval;
 
@@ -254,6 +262,7 @@ bool TwentyFour::evaluateInput(std::string expression) {
     }
 }
 
+//Main game loop & logic
 bool TwentyFour::playGame(int attempts, int timeLimit) {
     pickCards();
 
@@ -383,6 +392,7 @@ bool TwentyFour::playGame(int attempts, int timeLimit) {
     return win;
 }
 
+//Function called in main.cpp
 bool runTwentyFour(int attempts, int timeLimit) {
     TwentyFour game;
     return game.playGame(attempts, timeLimit);
