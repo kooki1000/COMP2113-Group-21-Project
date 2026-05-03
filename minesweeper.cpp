@@ -34,7 +34,6 @@
 #include <ctime>
 #include <fstream>
 #include <chrono>
-#include "types.h"
 #include "minesweeper.h"
 #include "menu.h"
 #include "colors.h"
@@ -80,7 +79,7 @@ void Minesweeper::clearScreen() {
 
 //Converts user input to uppercase so user input is not case-sensitive
 char Minesweeper::toUpper(char c){
-    return toupper(c);
+    return (char)toupper((unsigned char)c);
 }
 
 //Checks if the user input lies within the set grid
@@ -287,28 +286,42 @@ void Minesweeper::gameOverMessage() {
 
 //Handles user input + validates input follows correct format (action, x, y)
 void Minesweeper::getPlayerInput() {
-    char action;
-    int x, y;
     while (true) {
-        std::cout << "Action (R/F/Q row col): ";
-        std::cin >> action;
+        int x, y;
+        char action;
+        std::cout << hpad(58) << "Action (R=reveal, F=flag, Q=flee [-2x penalty]) row col: ";
+        if (!(std::cin >> action)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << hpad(58) << "Invalid input. Try again.\n";
+            continue;
+        }
         action = toUpper(action);
-        
         if (action == 'Q') {
             g_minigameForfeited = true;
             gameOver = true;
             win = false;
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             return;
         }
-        if (action == 'R' || action == 'F') {
-            if (std::cin >> x >> y) {
-                makeMove(action, x, y);
-                return;
-            }
+        if (action != 'R' && action != 'F') {
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << hpad(58) << "Use R (reveal), F (flag), or Q (flee).\n";
+            continue;
         }
-        std::cout << "Invalid input! Use R/F row col or Q\n";
-        std::cin.clear();
-        std::cin.ignore(1000, '\n');
+        if (!(std::cin >> x >> y)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << hpad(58) << "Enter valid row and column numbers.\n";
+            continue;
+        }
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        if (!isValidMove(x, y)) {
+            std::cout << hpad(58) << "Out of bounds. Row/col must be within the grid.\n";
+            continue;
+        }
+        makeMove(action, x, y);
+        return;
     }
 }
 
@@ -317,18 +330,11 @@ void Minesweeper::makeMove(char action, int x, int y){
     if (!isValidMove(x, y)) return;
 
     if (action == 'R') {
-        if(mineGrid[x][y]){
-            gameOver = true;
-            gameState=MINIGAME_LOSE;
-            return;
-        }
         if (revealedGrid[x][y] == '#') {
-            if (solutionGrid[x][y] == 0){
+            if (solutionGrid[x][y] == 0)
                 floodReveal(x, y);
-            }
-            else{
+            else
                 revealSingleCell(x, y);
-            }
         }
     } else if (action == 'F') {
         flagCell(x, y);
@@ -360,7 +366,7 @@ void Minesweeper::playGame() {
 
         std::cout << "\033[1;33m";
         msTopBar();
-        msLine("\xf0\x9f\x92\xa3 MINESWEEPER \xf0\x9f\x92\xa3", 16); 
+        msLine("💥 MINESWEEPER 💥", 15);
         msLine("R row col = reveal", 18);
         msLine("F row col = flag/unflag", 23);
         msBotBar();
