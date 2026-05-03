@@ -2,20 +2,15 @@
 // final_fight.h
 // TermiCraft — Final Boss Fight Module Header
 //
-// Declares all constants, structs, and functions for the Space Invaders-style
-// dragon boss fight. Fully integrated with the team's shared types.h, fileio.h,
-// menu.h, and colors.h. Does NOT redefine Difficulty, MaterialTier, HighScore,
-// or HIGHSCORE_FILE — all are taken from the team's existing headers.
+// Declares the boss-fight constants, structs, and functions used by the
+// ncurses-based dragon encounter implemented in final_fight.cpp.
 //
-// Arena:     100 x 35 terminal columns/rows
-// Rendering: ANSI escape codes via colors.h (no ncurses, no extra install)
-// Input:     Non-blocking via fcntl(O_NONBLOCK) + read() from <fcntl.h>/<unistd.h>
-// Score:     Added to state.score in real time, every increment multiplied by
-//            state.settings.scoreMultiplier (from types.h DifficultySettings)
+// Rendering: ncurses in the .cpp implementation (this header only declares API)
+// Input:     read by the fight loop in final_fight.cpp using ncurses getch()
+// Score:     Added to state.score in real time via score.cpp's addScore()
 //
 // Author:       Sohan
-// Dependencies: types.h, fileio.h, menu.h, colors.h
-//               <fcntl.h>, <unistd.h> — standard on Linux, no extra install
+// Dependencies: types.h, fileio.h, colors.h
 // =============================================================================
 
 #ifndef FINAL_FIGHT_H
@@ -24,7 +19,7 @@
 #include "types.h"   // GameState, Difficulty, MaterialTier — use team's definitions
 
 // -----------------------------------------------------------------------------
-// Arena dimensions
+// Arena dimensions used by the fight logic and layout comments
 // -----------------------------------------------------------------------------
 #define FF_ARENA_WIDTH     100   // total terminal columns
 #define FF_ARENA_HEIGHT     35   // total terminal rows
@@ -36,15 +31,15 @@
 #define FF_DRAGON_COLS      35   // width of the widest dragon line
 
 // -----------------------------------------------------------------------------
-// Dragon movement bounds
-// Left edge min = 2  (clears left border at col 0)
-// Left edge max = 63 (right edge = 63+35 = 98, border at col 99)
+// Dragon movement bounds used by the ncurses renderer
+// Left edge min = 2  (clears the left border)
+// Left edge max = 63 (keeps the 35-col art inside the 100-col arena)
 // -----------------------------------------------------------------------------
 #define FF_DRAGON_MIN_X      2
 #define FF_DRAGON_MAX_X     63
 
 // -----------------------------------------------------------------------------
-// Arena row layout  (rows 0-33 active; row 34 is a blank safety buffer)
+// Arena row layout used by the ncurses fight screen
 // -----------------------------------------------------------------------------
 #define FF_HUD_ROW           1   // score + dragon HP bar
 #define FF_HUD_SEP_ROW       2   // separator under HUD
@@ -64,14 +59,12 @@
 // -----------------------------------------------------------------------------
 // Boss fight base HP (local to this fight, independent of state.player.health)
 // Formula: calcFightHP(difficulty, armor) = baseHP + armorBonus
-// Base HP per difficulty:
 // -----------------------------------------------------------------------------
-// Base fight HP (no armor = this, it should hurt)
 #define FF_BASE_HP_EASY     20
 #define FF_BASE_HP_NORMAL   15
 #define FF_BASE_HP_HARD     10
 
-// Armor HP bonuses — armor should feel necessary
+// Armor HP bonuses — higher tiers give the player more breathing room
 #define FF_HP_BONUS_STONE   15
 #define FF_HP_BONUS_IRON    30
 #define FF_HP_BONUS_GOLD    50
@@ -94,8 +87,7 @@
 #define FF_PHASE3         3
 
 // -----------------------------------------------------------------------------
-// Score per arrow hit per phase — RAW value before scoreMultiplier
-// state.settings.scoreMultiplier (1.0 / 1.5 / 2.0) is applied on every add
+// Score per arrow hit per phase — raw values before scoreMultiplier
 // -----------------------------------------------------------------------------
 #define FF_SCORE_HIT_P1  10
 #define FF_SCORE_HIT_P2  20
@@ -117,7 +109,7 @@
  * BossConfig
  *
  * Difficulty-specific parameters for the boss fight.
- * Built once by initBossConfig() at fight start, never modified during the fight.
+ * Built once by initBossConfig() at fight start and then treated as read-only.
  */
 struct BossConfig {
     int  dragonHp;        // dragon starting HP
@@ -132,8 +124,8 @@ struct BossConfig {
  * Dragon
  *
  * Live state of the dragon enemy throughout the fight.
- * The full ASCII art block moves as a single unit: only x changes per tick.
- * y is always FF_DRAGON_TOP_ROW.
+ * The ASCII art moves as one block; x changes per tick and y stays anchored
+ * at the top of the dragon art area.
  */
 struct Dragon {
     int  x, y;
@@ -176,17 +168,16 @@ struct Arrow {
  * runBossFight
  *
  * Main entry point. Called from main.cpp when the player enters the dragon cave.
- * Manages: intro screen, game loop, score breakdown, name entry, high score
- * save via fileio's addHighScore(), and sets state.phase before returning.
+ * Manages the intro screen, the full ncurses fight loop, the score breakdown
+ * screen, and the final score save step.
  *
- * Score is added to state.score in real time throughout the fight.
- * Every addition is: state.score += (int)(rawPoints * state.settings.scoreMultiplier)
+ * Score is added to state.score in real time throughout the fight via addScore().
  *
  * Inputs:  state — full GameState (reads: score, difficulty, settings, armor)
  *                                 (writes: score, phase, dragonDefeated)
  * Outputs: true  = dragon defeated → state.phase set to PHASE_VICTORY
- *          false = player died     → state.phase set to PHASE_GAMEOVER
- *          Partial scores (death mid-fight) are still saved to the leaderboard.
+ *          false = player died, fled, or the terminal was too small
+ *                  → state.phase set to PHASE_GAMEOVER
  */
 bool runBossFight(GameState& state);
 
@@ -199,9 +190,9 @@ bool runBossFight(GameState& state);
  * Outputs: BossConfig fully populated for that difficulty
  *
  * Tick timing reference (FF_TICK_US = 50 ms per tick):
- *   Easy:   fireRateTicks=40  ≈ 2.0 s between volleys, dragonSpeed=1
- *   Normal: fireRateTicks=24  ≈ 1.2 s,                 dragonSpeed=2
- *   Hard:   fireRateTicks=14  ≈ 0.7 s,                 dragonSpeed=3
+ *   Easy:   fireRateTicks=35 ≈ 1.75 s between volleys, dragonSpeed=1
+ *   Normal: fireRateTicks=18 ≈ 0.9 s,                  dragonSpeed=2
+ *   Hard:   fireRateTicks=12 ≈ 0.6 s,                  dragonSpeed=3
  */
 BossConfig initBossConfig(Difficulty diff);
 
@@ -213,15 +204,15 @@ BossConfig initBossConfig(Difficulty diff);
  * No cap — armor always adds on top regardless of difficulty.
  *
  * Inputs:
- *   diff  — DIFF_EASY / DIFF_NORMAL / DIFF_HARD (base: 40 / 30 / 20)
+ *   diff  — DIFF_EASY / DIFF_NORMAL / DIFF_HARD (base: 20 / 15 / 10)
  *   armor — MaterialTier from types.h (MATERIAL_NONE through MATERIAL_DIAMOND)
  * Outputs: int — total starting HP
  *
  * Examples:
- *   calcFightHP(DIFF_EASY,   MATERIAL_DIAMOND) → 40 + 30 = 70
- *   calcFightHP(DIFF_NORMAL, MATERIAL_GOLD)    → 30 + 22 = 52
- *   calcFightHP(DIFF_HARD,   MATERIAL_IRON)    → 20 + 15 = 35
- *   calcFightHP(DIFF_HARD,   MATERIAL_NONE)    → 20 +  0 = 20
+ *   calcFightHP(DIFF_EASY,   MATERIAL_DIAMOND) → 20 + 80 = 100
+ *   calcFightHP(DIFF_NORMAL, MATERIAL_GOLD)    → 15 + 50 = 65
+ *   calcFightHP(DIFF_HARD,   MATERIAL_IRON)     → 10 + 30 = 40
+ *   calcFightHP(DIFF_HARD,   MATERIAL_NONE)     → 10 +  0 = 10
  */
 int calcFightHP(Difficulty diff, MaterialTier armor);
 
@@ -233,9 +224,9 @@ int calcFightHP(Difficulty diff, MaterialTier armor);
  * Inputs:  armor — MaterialTier (MATERIAL_NONE through MATERIAL_DIAMOND)
  * Outputs: int — damage per hit
  *            NONE / WOOD / STONE → 1
- *            IRON                → 3
- *            GOLD                → 5
- *            DIAMOND             → 8
+ *            IRON                → 4
+ *            GOLD                → 7
+ *            DIAMOND             → 12
  */
 int calcArmorDamage(MaterialTier armor);
 

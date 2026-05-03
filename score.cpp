@@ -11,8 +11,7 @@
 //   Guards against negative rawPoints so a buggy caller cannot reduce score.
 //
 // saveFinalScore():
-//   Prompts for player name via menu.h's getPlayerName().
-//   Builds a HighScore struct from current GameState.
+//   Reads the player name from state.player.name and builds a HighScore struct.
 //   Delegates to fileio's addHighScore() for top-10 sorting + disk write.
 //   Returns after printing a one-line confirmation to the player.
 //
@@ -21,7 +20,7 @@
 //   All persistence is handled by fileio.cpp (addHighScore, loadHighScores).
 //
 // Author:       Sohan
-// Dependencies: score.h, fileio.h, menu.h, colors.h, <ctime>, <iostream>
+// Dependencies: score.h, fileio.h, colors.h, <ctime>, <iostream>
 // =============================================================================
 
 #include "score.h"
@@ -75,7 +74,7 @@ void addScore(GameState& state, int rawPoints) {
 
 /*
  * saveFinalScore
- * End-of-run save flow: name prompt → HighScore build → fileio save.
+ * End-of-run save flow: read stored player name → HighScore build → fileio save.
  * Called exactly once per run, from final_fight.cpp's runBossFight()
  * after the score breakdown screen.
  *
