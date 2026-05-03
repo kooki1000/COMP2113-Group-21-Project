@@ -234,8 +234,54 @@ static const std::vector<std::string> WORDS_4 = {
 "wood","word","wore",
 "work","yard","yeah",
 "year","your","zero",
-"zone"
-};
+"zone",
+
+
+"acid","aide","airy",
+"alps","ally","arch",
+"army","atom","aunt",
+"axis","baby","bail",
+"bait","bald","bark",
+"barn","base","bash",
+"beam","bean","bear",
+"beef","beer","bell",
+"belt","bend","bent",
+"best","bike","bill",
+"bind","bird","bite",
+"blip","blob","blog",
+"blot","blow","blue",
+"boil","bold","bolt",
+"bomb","bond","bone",
+"book","boom","born",
+"boss","both","bowl",
+"bulk","bull","bump",
+"burn","bush","busy",
+"cafe","cake","calm",
+"camp","card","care",
+"cart","case","cash",
+"cast","cave","cell",
+"chat","chip","city",
+"clap","claw","clay",
+"clip","club","coal",
+"coat","code","coin",
+"cold","comb","come",
+"cook","cool","copy",
+"core","corn","cost",
+"crew","crop","cube",
+"curl","cute","dare",
+"dark","data","date",
+"dawn","deal","dear",
+"deck","deed","deep",
+"deny","desk","dial",
+"dice","diet","dirt",
+"disk","dive","dock",
+"done","door","dose",
+"drag","draw","drip",
+"drop","drug","drum",
+"duck","dull","dusk",
+"dust","earn","easy",
+"edge","edit","epic",
+"even","evil","exit"
 
 static const std::vector<std::string> WORDS_5 = {
 
@@ -692,6 +738,7 @@ bool runWordle(int wordLength) {
         if (guess == target) won = true;
     }
 
+    
     renderWordleBoard(guesses, target, wordLength);
 
 clearScreen();
