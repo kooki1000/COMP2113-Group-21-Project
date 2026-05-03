@@ -59,70 +59,6 @@
 #include <unistd.h>
 #include <vector>
 
-//parses puzzle numbers from puzzle bank
-static std::vector<int> parseNumbers(const std::string& numbersStr) {
-    std::vector<int> result;
-    
-    // extract only digits and commas
-    std::string clean;
-    for (char c : numbersStr) {
-        if (std::isdigit(c) || c == ',') {
-            clean += c;
-        }
-    }
-    
-    //split by comma
-    std::stringstream ss(clean);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (!token.empty()) {
-            result.push_back(std::stoi(token));
-        }
-    }
-    
-    return result;
-}
-
-//load puzzles from csv file
-static std::vector<std::vector<int>> loadPuzzleNumbers(const std::string& filename) {
-    std::vector<std::vector<int>> puzzles;
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        std::cerr << "ERROR: Cannot open " << filename << std::endl;
-        return puzzles;
-    }
-
-    
-    std::string line;
-    bool firstLine = true;
-    
-    while (std::getline(file, line)) {
-        
-        if (firstLine) {
-            firstLine = false;
-            continue;
-        }
-        
-        if (line.empty()) continue;
-        
-        //find the closing bracket
-        size_t bracketPos = line.find(']');
-        if (bracketPos == std::string::npos) continue;
-        
-        // extract numbers part (including the bracket)
-        std::string numbersPart = line.substr(0, bracketPos + 1);
-        
-        // parse
-        std::vector<int> numbers = parseNumbers(numbersPart);
-        
-        if (numbers.size() == 4) {
-            puzzles.push_back(numbers);
-        }
-    }
-    
-    return puzzles;
-}
-
 struct card {
     std::string face;
     int value;
@@ -133,25 +69,77 @@ class TwentyFour {
 public:
     TwentyFour();
     bool playGame(int attempts, int timeLimit);
-    
+
 private:
-    int gamestate;
-    bool win;
     void printCards(const std::vector<card>& cards);
     std::vector<card> picked;
     std::vector<std::vector<int>> allPuzzles;
+    bool win;
+    int gamestate;
+
     bool evaluateInput(std::string expression);
     void pickCards();
     bool validateInput(std::string expression);
     bool checkNumbersUsed(const std::string& expression, std::vector<card> numbers);
 };
 
-//Constructor
+static std::vector<int> parseNumbers(const std::string& numbersStr) {
+    std::vector<int> result;
+    std::string clean;
+
+    for (char c : numbersStr) {
+        if (std::isdigit(static_cast<unsigned char>(c)) || c == ',') {
+            clean += c;
+        }
+    }
+
+    std::stringstream ss(clean);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        if (!token.empty()) {
+            result.push_back(std::stoi(token));
+        }
+    }
+
+    return result;
+}
+
+static std::vector<std::vector<int>> loadPuzzleNumbers(const std::string& filename) {
+    std::vector<std::vector<int>> puzzles;
+    std::ifstream file(filename);
+
+    if (!file.is_open()) {
+        return puzzles;
+    }
+
+    std::string line;
+    bool firstLine = true;
+
+    while (std::getline(file, line)) {
+        if (firstLine) {
+            firstLine = false;
+            continue;
+        }
+
+        if (line.empty()) continue;
+
+        size_t bracketPos = line.find(']');
+        if (bracketPos == std::string::npos) continue;
+
+        std::vector<int> numbers = parseNumbers(line.substr(0, bracketPos + 1));
+
+        if (numbers.size() == 4) {
+            puzzles.push_back(numbers);
+        }
+    }
+
+    return puzzles;
+}
+
 TwentyFour::TwentyFour() : win(false), gamestate(0) {
     allPuzzles = loadPuzzleNumbers("twentyfourpuzzles.csv");
 }
 
-//displays numbers in a way that resembles poker cards
 void TwentyFour::printCards(const std::vector<card>& cards) {
     std::string P = hpad(47);
 
@@ -197,48 +185,25 @@ void TwentyFour::printCards(const std::vector<card>& cards) {
     std::cout << P;
     for (const auto& card : cards) std::cout << "└─────────┘ ";
     std::cout << "\n";
-};
-
-void TwentyFour::pickCards() {
-    if (allPuzzles.empty()) return;
-
-    int puzzleNumber = rand() % allPuzzles.size();
-    std::vector<int>& selectedNumbers = allPuzzles[puzzleNumber];
-    picked.clear();
-
-    for (int value : selectedNumbers) {
-        card c;
-        c.value = value;
-
-        if (value == 1) c.face = "A";
-        else if (value == 11) c.face = "J";
-        else if (value == 12) c.face = "Q";
-        else if (value == 13) c.face = "K";
-        else c.face = std::to_string(value);
-
-        c.suit = rand() % 4;
-        picked.push_back(c);
-    }
 }
 
-//selects a random puzzle from all puzzles
 void TwentyFour::pickCards() {
     if (allPuzzles.empty()) return;
-    
+
     int puzzleNumber = rand() % allPuzzles.size();
     std::vector<int>& selectedNumbers = allPuzzles[puzzleNumber];
     picked.clear();
-    
+
     for (int value : selectedNumbers) {
         card c;
         c.value = value;
-        
+
         if (value == 1) c.face = "A";
         else if (value == 11) c.face = "J";
         else if (value == 12) c.face = "Q";
         else if (value == 13) c.face = "K";
         else c.face = std::to_string(value);
-        
+
         c.suit = rand() % 4;
         picked.push_back(c);
     }
@@ -246,22 +211,23 @@ void TwentyFour::pickCards() {
 
 bool TwentyFour::validateInput(std::string expression) {
     if (expression.empty()) {
-        std::cout << "Error: Please enter an expression" << std::endl;
+        std::cout << hpad(35) << "Error: Please enter an expression\n";
         return false;
     }
+
     std::string validChars = "0123456789+-*/() .";
     for (char c : expression) {
         if (validChars.find(c) == std::string::npos) {
-            std::cout << "Error: Invalid character in expression" << std::endl;
+            std::cout << hpad(38) << "Error: Invalid character in expression\n";
             return false;
         }
     }
+
     evaluator eval;
     try {
         eval.evaluate(expression);
         return true;
-    }
-    catch (const std::exception& e){
+    } catch (const std::exception&) {
         return false;
     }
 }
@@ -269,24 +235,25 @@ bool TwentyFour::validateInput(std::string expression) {
 bool TwentyFour::checkNumbersUsed(const std::string& expression, std::vector<card> cards) {
     evaluator eval;
     std::vector<int> cardValues;
+
     for (const auto& card : cards) {
         cardValues.push_back(card.value);
     }
+
     return eval.checkNumbersUsed(expression, cardValues);
 }
 
-//Checks if input expression is equal to 24
 bool TwentyFour::evaluateInput(std::string expression) {
     evaluator eval;
+
     try {
         double result = eval.evaluate(expression);
         return std::fabs(result - 24.0) < 1e-9;
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         return false;
     }
 }
 
-//Main game logic
 bool TwentyFour::playGame(int attempts, int timeLimit) {
     pickCards();
 
@@ -415,11 +382,8 @@ bool TwentyFour::playGame(int attempts, int timeLimit) {
 
     return win;
 }
-//easy mode: 5 attempts, 180 seconds 
-//medium mode: 3 attempts, 90 seconds
-//hard mode: 1 attempt, 30 seconds
+
 bool runTwentyFour(int attempts, int timeLimit) {
     TwentyFour game;
-    return game.playGame(attempts, timeLimit)
+    return game.playGame(attempts, timeLimit);
 }
-
