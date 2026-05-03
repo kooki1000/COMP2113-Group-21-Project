@@ -17,21 +17,21 @@
 
 ### Player Controller & Mining System (`player.h`, `player.cpp`)
 
-Implements the core player entity with real-time keyboard input handling (WASD movement, SPACE mining), physics simulation (gravity fall when standing over air), and combat mechanics. Manages the strict equipment progression system, triggers minigames during mining attempts based on calculated probability, and handles dynamic enemy spawning from disturbed blocks.
+Implements the core player entity with real-time keyboard input handling (WASD movement, SPACE mining) and collision checks, plus mining flow with tool-tier requirements. Manages camera tracking, mining rewards/penalties, and crafting-progression hooks that trigger minigames when higher-tier upgrades are attempted.
 
 **How coding elements are met:**
 
-- **Random events (Element 1):** Enemy spawning uses `rand() % 100` against `enemySpawnChance` settings after each successful mine. Mining minigame triggers use a calculated probability formula (`baseChance * (MINIGAME_COUNT / NUM_DISTINCT_ORES)`) with random rolls in the range [10%, 16%] to determine if a challenge occurs; dragon caves always trigger challenges regardless of roll.
+- **Random events (Element 1):** Mining minigame triggers use a calculated probability formula (`baseChance * (MINIGAME_COUNT / NUM_DISTINCT_ORES)`) with random rolls in the range [10%, 16%] to determine if a challenge occurs; dragon caves always trigger challenges regardless of roll. Minigame selection for mining and for crafting progression is randomized among Wordle, Minesweeper, 24 Game, and Sudoku.
 
-- **Data structures (Element 2):** Defines and manipulates `GameState` references containing `Position`, `Inventory`, `Equipment`, and `Enemy` structs. Uses `std::vector<Enemy>` to dynamically track active cave enemies with their health, position, and damage stats.
+- **Data structures (Element 2):** Defines and manipulates `GameState` data containing `Position`, `Inventory`, `Equipment`, and mining/minigame state such as `pendingMinePos`, `pendingMineType`, and `currentMinigame`. Uses shared enums like `BlockType`, `MaterialTier`, and `MinigameType` to drive tool gating and minigame flow.
 
-- **Dynamic memory management (Element 3):** Enemy entities are dynamically added to the game world via `state.enemies.push_back(e)` when spawn conditions are met after mining. The vector automatically handles memory allocation for the enemy pool; no manual `new`/`delete` is required.
+- **Dynamic memory management (Element 3):** No manual `new`/`delete` is used. Inventory and state updates rely on value types in `GameState`, with `std::vector` used where the global game state needs dynamic collections.
 
 - **File I/O (Element 4):** Integrates with the score system by calling `addScore()` from `score.h` upon successful mining, which delegates to `fileio` for persistent high score storage. Does not perform direct file operations, maintaining clean separation of concerns.
 
 - **Multiple files (Element 5):** Split across `player.h` (interface) and `player.cpp` (implementation). Integrates with `types.h` (shared state), `colors.h` (rendering), `menu.h` (UI utilities), `crafting.h` (equipment checks), and `score.h` (persistence). The minigame initialization uses `std::shuffle` from `<algorithm>` on a static array of minigame types.
 
-- **Difficulty levels (Element 6):** Reads difficulty settings from `GameState` to scale enemy health (`enemyHealthMult`), minigame damage (`minigameDamage`), and spawn rates. Tool requirements for mining blocks create a soft difficulty curve (hands → wood → stone → iron → gold → diamond), while dragon cave blocks remain accessible regardless of tier, providing risk/reward choices on higher difficulties.
+- **Difficulty levels (Element 6):** Reads difficulty settings from `GameState` to set player starting health and minigame damage (`minigameDamage`). Tool requirements for mining blocks create a soft difficulty curve (hands → wood → stone → iron → gold → diamond), while dragon cave blocks remain accessible regardless of tier, providing risk/reward choices on higher difficulties.
 
 ---
 
@@ -681,15 +681,15 @@ All other headers (`<unistd.h>`, `<locale.h>`, `<algorithm>`, `<cstdio>`,
 
 ### Crafting & Equipment System (`crafting.h`, `crafting.cpp`)
 
-Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes (Wood through Diamond for pickaxes and armor). Implements strict progression gating where Iron, Gold, and Diamond upgrades trigger "Rite of Passage" minigames before completion. Features real-time resource validation, color-coded availability indicators, and detailed inventory display with health bonuses for armor upgrades.
+Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes (Wood through Diamond for pickaxes and armor). Implements strict progression gating where pickaxe upgrades beyond Stone trigger a "Rite of Passage" minigame before the upgrade is confirmed. Features real-time resource validation, color-coded availability indicators, and detailed inventory display with health bonuses for armor upgrades.
 
 **How coding elements are met:**
 
 - **Data structures (Element 2):** Uses a static constant array of `CraftingRecipe` structs (10 entries) defining resource costs, prerequisites, and display metadata. Validates against `Inventory` and `Equipment` structs from `types.h` to determine craftability. Equipment tiers are enforced via the `MaterialTier` enum.
 
-- **Multiple files (Element 5):** Modular design with `crafting.h` exposing the menu interface and `crafting.cpp` containing UI rendering and validation logic. Integrates with `player.h` for progression checks (`checkCraftingProgression`, `performCrafting`), `colors.h` for ANSI color coding, and `menu.h` for terminal input handling (`getch`, `clearScreen`).
+- **Multiple files (Element 5):** Modular design with `crafting.h` exposing the menu interface and `crafting.cpp` containing UI rendering and validation logic. Integrates with `player.h` for progression checks (`checkCraftingProgression`) and healing (`healPlayer`), `colors.h` for ANSI color coding, and `menu.h` for terminal input handling (`getch`, `clearScreen`).
 
-- **Difficulty levels (Element 6):** Equipment crafting follows strict tier progression (Wood→Stone→Iron→Gold→Diamond). Iron, Gold, and Diamond upgrades require completing minigame challenges (Wordle/Minesweeper) via the player module before the upgrade applies, effectively gating high-tier content behind skill-based challenges that scale with the desired equipment level. Armor upgrades provide incremental max health bonuses (+5 to +40 HP) that aid survival on higher difficulties.
+- **Difficulty levels (Element 6):** Equipment crafting follows strict tier progression (Wood→Stone→Iron→Gold→Diamond). Pickaxe upgrades beyond Stone trigger a randomized minigame (Wordle, Minesweeper, 24 Game, or Sudoku) via the player module before the upgrade is confirmed, effectively gating high-tier content behind skill-based challenges. Armor upgrades provide incremental max health bonuses (+5 to +25 HP) that aid survival on higher difficulties.
 
 ---
 
