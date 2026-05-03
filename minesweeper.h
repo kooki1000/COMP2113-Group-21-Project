@@ -61,7 +61,7 @@ private:
     char toUpper(char c);
     double getElapsedTime();
     void showHighScore();
-    void saveHighScore(double time);
+    void writeHighScore(double time);
     void gameOverMessage();
 };
 
