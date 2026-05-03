@@ -28,21 +28,58 @@
 
 #include "types.h"
 
-// Main entry point for the crafting menu
-// Handles the full UI loop and returns when player presses Q or when a
-// minigame is triggered (sets state.minigameActive and state.phase)
+// Main entry point for the crafting menu.
+//
+// Inputs:
+// - state (GameState&): GameState to read for inventory/equipment and to update
+//   when crafting occurs or a minigame is triggered.
+//
+// Effects:
+// - Runs the full UI loop until the player exits (Q) or a minigame is triggered.
+// - Updates state.phase and state.minigameActive when a rite-of-passage begins.
 void openCraftingMenu(GameState& state);
 
-// Detailed inventory display (called when player presses 'I')
+// Display the full-screen inventory UI.
+//
+// Inputs:
+// - state (const GameState&): GameState to read inventory, equipment, and health.
+//
+// Effects:
+// - Clears the screen, renders inventory, and waits for a keypress to return.
 void showInventory(const GameState& state);
 
-// Check if player meets requirements for a recipe
+// Check whether the player can craft a specific recipe right now.
+//
+// Inputs:
+// - state (const GameState&): GameState containing inventory and equipment tiers.
+// - recipe (const CraftingRecipe&): Recipe to evaluate.
+//
+// Returns:
+// - true if prerequisites and resource costs are satisfied; false otherwise.
 bool canCraft(const GameState& state, const CraftingRecipe& recipe);
 
-// Get specific error message for why crafting failed
+// Get a user-facing error string that explains why crafting failed.
+//
+// Inputs:
+// - state (const GameState&): GameState with current inventory/equipment.
+// - recipe (const CraftingRecipe&): Recipe to evaluate.
+//
+// Returns:
+// - A specific failure message (missing prereq or missing resources).
 std::string getCraftingError(const GameState& state, const CraftingRecipe& recipe);
 
-// Execute crafting. Returns true if a minigame was triggered (Iron/Gold/Diamond)
+// Execute crafting and apply the recipe's effects.
+//
+// Inputs:
+// - state (GameState&): GameState to mutate (inventory, equipment, and messages).
+// - recipe (const CraftingRecipe&): Recipe to craft.
+//
+// Returns:
+// - true if a minigame was triggered by the new tier; false otherwise.
+//
+// Effects:
+// - Deducts resources, upgrades equipment, adjusts health on armor upgrades,
+//   and sets a success message.
 bool performCrafting(GameState& state, const CraftingRecipe& recipe);
 
 #endif

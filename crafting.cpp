@@ -39,7 +39,10 @@
 #include "menu.h"    // For getch() and clearScreen()
 #include "player.h"  // For checkCraftingProgression() and healPlayer()
 
-// Recipe definitions matching the progression chart
+// Recipe definitions matching the progression chart.
+//
+// Each recipe encodes tier, armor/tool flag, resource costs, prerequisites,
+// and display strings for the crafting UI.
 const CraftingRecipe RECIPES[] = {
     // Tier 1: Wood (1 wood each, no prereqs)
     {MATERIAL_WOOD, false, 1, 0, 0, 0, 0, MATERIAL_NONE, MATERIAL_NONE,
@@ -73,13 +76,27 @@ const CraftingRecipe RECIPES[] = {
 
 const int NUM_RECIPES = sizeof(RECIPES) / sizeof(RECIPES[0]);
 
-// Helper: Check if recipe is visible (prereqs met) vs locked
+// Check if a recipe should be visible in the menu (prereqs met) vs locked.
+//
+// Inputs:
+// - state (const GameState&): GameState with current equipment tiers.
+// - recipe (const CraftingRecipe&): Recipe to evaluate.
+//
+// Returns:
+// - true if both pickaxe and armor prerequisites are met; false otherwise.
 bool isRecipeVisible(const GameState& state, const CraftingRecipe& recipe) {
     return state.player.equipment.pickaxe >= recipe.requiredPickaxe &&
            state.player.equipment.armor >= recipe.requiredArmor;
 }
 
-// Check if player can craft right now
+// Check if the player can craft a recipe right now.
+//
+// Inputs:
+// - state (const GameState&): GameState containing inventory/equipment.
+// - recipe (const CraftingRecipe&): Recipe to evaluate.
+//
+// Returns:
+// - true if prerequisites and costs are satisfied; false otherwise.
 bool canCraft(const GameState& state, const CraftingRecipe& recipe) {
     if (!isRecipeVisible(state, recipe)) return false;
 
@@ -91,7 +108,14 @@ bool canCraft(const GameState& state, const CraftingRecipe& recipe) {
            inv.diamond >= recipe.diamondCost;
 }
 
-// Get error message for display
+// Build a specific error message for why crafting failed.
+//
+// Inputs:
+// - state (const GameState&): GameState containing inventory/equipment.
+// - recipe (const CraftingRecipe&): Recipe to evaluate.
+//
+// Returns:
+// - A user-facing error string indicating the first unmet requirement.
 std::string getCraftingError(const GameState& state, const CraftingRecipe& recipe) {
     if (!isRecipeVisible(state, recipe)) {
         if (recipe.tier == MATERIAL_WOOD) return "Gather wood first";
@@ -108,7 +132,18 @@ std::string getCraftingError(const GameState& state, const CraftingRecipe& recip
     return "Unknown error";
 }
 
-// Execute crafting
+// Execute crafting and apply recipe effects.
+//
+// Inputs:
+// - state (GameState&): GameState to mutate (inventory, equipment, messages).
+// - recipe (const CraftingRecipe&): Recipe to craft.
+//
+// Returns:
+// - true if a minigame was triggered by the new tier; false otherwise.
+//
+// Effects:
+// - Deducts resources, upgrades equipment, adjusts max health for armor, and
+//   updates the status message.
 bool performCrafting(GameState& state, const CraftingRecipe& recipe) {
     if (!canCraft(state, recipe)) return false;
 
@@ -138,7 +173,14 @@ bool performCrafting(GameState& state, const CraftingRecipe& recipe) {
     return false;
 }
 
-// Render the crafting interface
+// Render the crafting interface for the current selection.
+//
+// Inputs:
+// - state (const GameState&): GameState to read inventory and equipment values.
+// - selectedIndex (int): Index into RECIPES for the highlighted entry.
+//
+// Effects:
+// - Draws a full-screen UI with recipe list, inventory sidebar, and details.
 void renderCraftingUI(const GameState& state, int selectedIndex) {
     // Compute centering: box is 80 chars wide
     int termCols, termRows;
@@ -301,7 +343,13 @@ void renderCraftingUI(const GameState& state, int selectedIndex) {
               << COLOR_RESET;
 }
 
-// Main crafting menu loop
+// Run the main crafting menu loop.
+//
+// Inputs:
+// - state (GameState&): GameState to mutate via crafting and minigame triggers.
+//
+// Effects:
+// - Handles navigation input, performs crafting, and exits on Q or minigame.
 void openCraftingMenu(GameState& state) {
     int selected = 0;
 
@@ -370,7 +418,13 @@ void openCraftingMenu(GameState& state) {
     }
 }
 
-// Detailed inventory display (full screen)
+// Render the full-screen inventory display.
+//
+// Inputs:
+// - state (const GameState&): GameState to read inventory, equipment, and health.
+//
+// Effects:
+// - Clears the screen, prints inventory and equipment, and waits for a keypress.
 void showInventory(const GameState& state) {
     clearScreen();
 
