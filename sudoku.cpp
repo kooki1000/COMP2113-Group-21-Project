@@ -1,4 +1,3 @@
-```cpp
 /*
  * sudoku.cpp
  *
@@ -19,67 +18,175 @@
  * - Use terminal rendering with ANSI colors for UX
  * - Keep interaction simple (text input)
  *
- * LIMITATIONS (IMPORTANT):
- * - Does NOT guarantee a unique solution
- * - Solved state only checks if all cells are filled (not correctness)
- * - Random removal is naive (no difficulty heuristics)
+ * ARCHITECTURE OVERVIEW:
+ * - SudokuGame class owns all state (grid, UI state, constraints)
+ * - generateBoard() builds puzzle from solved grid
+ * - solveGrid() is a full backtracking generator
+ * - playGame() handles user interaction loop
+ * - displayBoard() renders terminal UI
  *
- * Despite these, this is a solid baseline Sudoku engine.
+ * CORE DATA STRUCTURES:
+ * - grid[r][c]   → Sudoku board values (0 = empty)
+ * - fixed[r][c]  → original puzzle clues (immutable cells)
+ * - size         → board dimension (6 or 9)
+ * - boxR / boxC  → subgrid structure
+ *
+ * GAME LOOP FLOW:
+ * 1. Constructor initializes difficulty parameters
+ * 2. generateBoard() builds a full valid solution
+ * 3. Cells are removed randomly to form puzzle
+ * 4. Player interacts via playGame()
+ * 5. Board updates until completion or exit
+ *
  */
 
-#include "colors.h"   // ANSI color codes for styling terminal output
-#include "menu.h"     // Provides clearScreen() and menu-related utilities
-#include "types.h"    // Defines Difficulty enum (DIFF_EASY, etc.)
 
-#include <algorithm>  // std::shuffle
-#include <cstdlib>    // rand(), srand()
-#include <ctime>      // time() for seeding RNG
-#include <iostream>   // std::cout, std::cin
-#include <random>     // modern random utilities (mt19937)
-#include <sstream>    // parsing input strings
-#include <string>     // std::string
-#include <termios.h>  // terminal control (raw/cooked mode switching)
-#include <unistd.h>   // STDIN_FILENO
-#include <vector>     // 2D grid storage
 
+
+#include "colors.h"
+#include "menu.h"
+#include "types.h"
+#include <algorithm>
+#include <cstdlib>
+#include <ctime>
+#include <iostream>
+#include <random>
+#include <sstream>
+#include <string>
+#include <termios.h>
+#include <unistd.h>
+#include <vector>
+
+
+
+
+/*
+ * CLASS: SudokuGame
+ *
+ * Encapsulates:
+ * - Board generation
+ * - Constraint checking
+ * - Rendering logic
+ * - Player input handling
+ */
 class SudokuGame {
 private:
+
+    // ----------------------------
+    // BOARD CONFIGURATION STATE
+    // ----------------------------
+
+    int size;                 // board dimension (6 or 9)
+    int boxR;                 // subgrid rows
+    int boxC;                 // subgrid columns
+
+    // ----------------------------
+    // CORE GAME STATE
+    // ----------------------------
+
+    std::vector<std::vector<int>> grid;     // current board state
+    std::vector<std::vector<bool>> fixed;    // immutable clue cells
+
+    int cellsToRemove;       // difficulty-based puzzle sparsity
+
+    // ----------------------------
+    // UI STATE
+    // ----------------------------
+
+    std::string lastMessage;  // feedback message shown after move
+    std::string boardP;       // padding used for alignment
+
     /*
-     * === CORE GAME PARAMETERS ===
+     * waitForKey()
+     *
+     * PURPOSE:
+     * Blocks execution until a single key is pressed.
+     *
+     * IMPLEMENTATION NOTE:
+     * Uses termios to temporarily disable canonical input buffering
+     * so input is captured immediately.
+     */
+    void waitForKey() {
+        const char* prompt = "Press any key to continue...";
+        std::cout << "\n" << hpad(28) << COLOR_DIM << prompt << COLOR_RESET;
+        std::cout.flush();
+
+        struct termios oldt, raw;
+        tcgetattr(STDIN_FILENO, &oldt);
+
+        raw = oldt;
+        raw.c_lflag &= ~(ICANON | ECHO);
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+        tcflush(STDIN_FILENO, TCIFLUSH);
+
+        char dummy;
+        read(STDIN_FILENO, &dummy, 1);
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    }
+
+    /*
+     * showEndScreen()
+     *
+     * PURPOSE:
+     * Displays win/lose ASCII screen and pauses.
      */
 
-    int size;   // Board dimension (6 or 9)
-    int boxR;   // Number of rows in each subgrid
-    int boxC;   // Number of columns in each subgrid
+
+
+    void showEndScreen(bool won) {
+        clearAndCenterV(won ? 12 : 11);
+
+        std::string Aw = hpad(59);
+        std::string Ag = hpad(80);
+
+        if (won) {
+            // WIN CONDITION UI
+            std::cout << COLOR_BOLD_GREEN << "\n"
+                << Aw << "   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗\n"
+                << Aw << "   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║\n"
+                << Aw << "    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║\n"
+                << Aw << "     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║\n"
+                << Aw << "      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║\n"
+                << Aw << "      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝\n"
+                << COLOR_RESET << "\n";
+
+            std::cout << "\n" << hpad(24) << "Sudoku board solved.\n";
+        } else {
+            // EXIT / LOSS SCREEN UI
+            std::cout << COLOR_BOLD_RED << "\n"
+                << Ag << "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗\n"
+                << Ag << "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗\n"
+                << Ag << "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝\n"
+                << Ag << "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗\n"
+                << Ag << "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║\n"
+                << Ag << "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝\n"
+                << COLOR_RESET << "\n";
+
+            std::cout << "\n" << hpad(17) << "You fled Sudoku.\n";
+        }
+
+        // Always pause before returning control
+        waitForKey();
+    }
 
     /*
-     * === GAME STATE ===
+     * printDivider()
+     *
+     * PURPOSE:
+     * Draws horizontal separator lines between subgrids.
      */
 
-    // Main Sudoku grid:
-    // 0 represents an empty cell
-    std::vector<std::vector<int>> grid;
 
-    // Tracks which cells are fixed (part of original puzzle)
-    // true  → cannot be changed by player
-    // false → player-editable
-    std::vector<std::vector<bool>> fixed;
 
-    int cellsToRemove;   // Number of cells removed to create puzzle
-    std::string lastMessage; // Stores last error/info message for UI
-
-    /*
-     * === UI HELPER ===
-     * Prints horizontal divider between subgrid rows.
-     */
     void printDivider() {
-        std::cout << "    " << COLOR_CYAN << "+";
+        std::cout << boardP << "    " << COLOR_CYAN << "+";
 
-        // Print 3 dashes per column for visual spacing
         for (int c = 0; c < size; c++) {
             std::cout << "---";
 
-            // Add thicker divider at subgrid boundaries
+            // Subgrid boundary marker
             if ((c + 1) % boxC == 0) {
                 std::cout << "+";
             }
@@ -89,35 +196,31 @@ private:
     }
 
     /*
-     * === VALIDATION FUNCTION ===
-     * Checks whether placing 'num' at (r, c) is valid.
+     * isSafe()
      *
-     * RULES CHECKED:
-     * 1. Row uniqueness
-     * 2. Column uniqueness
-     * 3. Subgrid uniqueness
+     * PURPOSE:
+     * Validates Sudoku constraints for a candidate move.
      *
-     * Returns true if safe, false otherwise.
+     * RULES:
+     * - No duplicates in row
+     * - No duplicates in column
+     * - No duplicates in subgrid
      */
+
+
     bool isSafe(int r, int c, int num) {
 
-        // =======================================================
-        // ROW & COLUMN VALIDATION
-        // Ensures Sudoku constraint: each number must be unique
-        // within its row and column before placement is allowed.
-        // This is the first and cheapest validity filter.
-        // =======================================================
-        
+        // Row & column validation
         for (int i = 0; i < size; i++) {
             if (grid[r][i] == num || grid[i][c] == num)
                 return false;
         }
 
-        // Compute top-left corner of subgrid
+        // Subgrid calculation
         int startRow = r - r % boxR;
         int startCol = c - c % boxC;
 
-        // Check subgrid
+        // Subgrid validation
         for (int i = 0; i < boxR; i++) {
             for (int j = 0; j < boxC; j++) {
                 if (grid[i + startRow][j + startCol] == num)
@@ -129,11 +232,10 @@ private:
     }
 
     /*
-     * === FIND EMPTY CELL ===
-     * Finds the next unassigned cell (value 0).
+     * findUnassigned()
      *
-     * Returns true and sets (r, c) if found.
-     * Returns false if grid is full.
+     * PURPOSE:
+     * Finds first empty cell (0) for backtracking solver.
      */
     bool findUnassigned(int& r, int& c) {
         for (r = 0; r < size; r++) {
@@ -145,37 +247,32 @@ private:
         return false;
     }
 
+
     /*
-     * === BACKTRACKING SOLVER ===
+     * solveGrid()
      *
-     * Recursively fills the grid using:
-     * - Try all numbers in random order
-     * - Place if valid
-     * - Recurse
-     * - Backtrack if needed
+     * PURPOSE:
+     * Generates a full valid Sudoku solution using backtracking.
      *
-     * This is used BOTH for:
-     * - Generating a complete valid board
-     * - (Potentially) solving puzzles
+     * TECHNIQUE:
+     * - DFS recursion
+     * - randomized candidate order
+     * - backtracking on invalid states
      */
     bool solveGrid() {
         int r, c;
 
-        // If no empty cell → solved
         if (!findUnassigned(r, c))
             return true;
 
-        // Generate list of candidate numbers
         std::vector<int> nums;
         for (int i = 1; i <= size; i++)
             nums.push_back(i);
 
-        // Shuffle for randomness → different boards each run
         std::random_device rd;
         std::mt19937 g(rd());
         std::shuffle(nums.begin(), nums.end(), g);
 
-        // Try each candidate
         for (int num : nums) {
             if (isSafe(r, c, num)) {
                 grid[r][c] = num;
@@ -183,7 +280,6 @@ private:
                 if (solveGrid())
                     return true;
 
-                // Backtrack
                 grid[r][c] = 0;
             }
         }
@@ -192,203 +288,169 @@ private:
     }
 
     /*
-     * === BOARD GENERATION ===
+     * generateBoard()
      *
-     * Steps:
-     * 1. Create empty grid
-     * 2. Fill completely using solver
-     * 3. Remove cells randomly
-     * 4. Mark remaining cells as fixed
+     * PURPOSE:
+     * Builds playable Sudoku puzzle from full solution.
+     *
+     * STEPS:
+     * 1. Generate full solved grid
+     * 2. Randomly remove cells
+     * 3. Mark remaining cells as fixed clues
      */
+
+
     void generateBoard() {
-        // Initialize empty grid
         grid.assign(size, std::vector<int>(size, 0));
         fixed.assign(size, std::vector<bool>(size, false));
-        lastMessage = "";
 
-        // Fill entire grid with valid solution
         solveGrid();
 
-        // Randomly remove cells
         int removed = 0;
         while (removed < cellsToRemove) {
             int r = rand() % size;
             int c = rand() % size;
 
-            // Only remove non-empty cells
             if (grid[r][c] != 0) {
                 grid[r][c] = 0;
                 removed++;
             }
         }
 
-        // Mark remaining cells as fixed
+        // Mark clues
         for (int r = 0; r < size; r++) {
             for (int c = 0; c < size; c++) {
-                if (grid[r][c] != 0) {
+                if (grid[r][c] != 0)
                     fixed[r][c] = true;
-                }
             }
         }
     }
 
     /*
-     * === COMPLETION CHECK ===
+     * isSolved()
      *
      * NOTE:
-     * This ONLY checks if all cells are filled.
-     * It does NOT verify correctness.
+     * This only checks completeness, not correctness.
      */
     bool isSolved() {
-        for (int r = 0; r < size; r++) {
-            for (int c = 0; c < size; c++) {
+        for (int r = 0; r < size; r++)
+            for (int c = 0; c < size; c++)
                 if (grid[r][c] == 0)
                     return false;
-            }
-        }
+
         return true;
     }
 
+
 public:
     /*
-     * === CONSTRUCTOR ===
-     *
-     * Sets parameters based on difficulty:
-     * - Grid size
-     * - Subgrid dimensions
-     * - Number of cells removed
+     * Constructor:
+     * Initializes difficulty parameters and generates puzzle.
      */
     SudokuGame(Difficulty diff) {
-        srand(static_cast<unsigned int>(time(nullptr)));
+        srand(time(nullptr));
 
         if (diff == DIFF_EASY) {
-            size = 6; boxR = 2; boxC = 3;
-            cellsToRemove = 15;
-        }
-        else if (diff == DIFF_NORMAL) {
-            size = 6; boxR = 2; boxC = 3;
-            cellsToRemove = 22;
-        }
-        else {
-            size = 9; boxR = 3; boxC = 3;
-            cellsToRemove = 45;
+            size = 6; boxR = 2; boxC = 3; cellsToRemove = 15;
+        } else if (diff == DIFF_NORMAL) {
+            size = 6; boxR = 2; boxC = 3; cellsToRemove = 22;
+        } else {
+            size = 9; boxR = 3; boxC = 3; cellsToRemove = 45;
         }
 
         generateBoard();
     }
 
     /*
-     * === RENDER BOARD ===
+     * displayBoard()
      *
-     * Displays:
-     * - Title UI
-     * - Column/row indices
-     * - Grid with color coding
-     *
-     * Color legend:
-     * - Yellow → fixed cells
-     * - Green  → user-filled
-     * - Dim    → empty cells
+     * PURPOSE:
+     * Renders full Sudoku grid in terminal UI.
      */
     void displayBoard() {
-        clearScreen();
 
-        // Title banner
+        int totalLines = 5 + 1 + (size + (size / boxR) + 1) + 5;
+        clearAndCenterV(totalLines);
+
+        std::string titleP = hpad(36);
+        boardP = hpad(size * 3 + (size / boxC) + 4);
+
         std::cout << COLOR_BOLD_CYAN;
-        std::cout << "\n    ╔══════════════════════════════════╗\n";
-        std::cout <<   "    ║      🔢 SUDOKU MINIGAME 🔢       ║\n";
-        std::cout <<   "    ║  Fill the grid so every row,     ║\n";
-        std::cout <<   "    ║  column, and box is unique!      ║\n";
-        std::cout <<   "    ╚══════════════════════════════════╝\n\n";
+
+        std::cout << "\n" << titleP << "╔══════════════════════════════════╗\n";
+        std::cout << titleP << "║      🔢 SUDOKU MINIGAME 🔢      ║\n";
+        std::cout << titleP << "║  Fill the grid so every row,     ║\n";
+        std::cout << titleP << "║  column, and box is unique!      ║\n";
+        std::cout << titleP << "╚══════════════════════════════════╝\n\n";
+
         std::cout << COLOR_RESET;
 
-        // Column labels
-        std::cout << "      ";
+        // Column headers
+        std::cout << boardP << "     ";
         for (int c = 0; c < size; c++) {
-            std::cout << COLOR_DIM << (c + 1) << "  " << COLOR_RESET;
-            if ((c + 1) % boxC == 0)
-                std::cout << "  ";
+            std::cout << COLOR_DIM << " " << (c + 1) << " " << COLOR_RESET;
+            if ((c + 1) % boxC == 0) std::cout << " ";
         }
         std::cout << "\n";
 
+
+
+        
         printDivider();
 
-        // Print rows
+        // Grid rendering loop
         for (int r = 0; r < size; r++) {
-            std::cout << COLOR_DIM << "  " << (r + 1) << COLOR_RESET
-                      << " " << COLOR_CYAN << "|" << COLOR_RESET;
+            std::cout << boardP << COLOR_DIM << "  " << (r + 1)
+                      << COLOR_RESET << " " << COLOR_CYAN << "|" << COLOR_RESET;
 
             for (int c = 0; c < size; c++) {
-                if (grid[r][c] == 0) {
+                if (grid[r][c] == 0)
                     std::cout << COLOR_DIM << " . " << COLOR_RESET;
-                }
-                else if (fixed[r][c]) {
-                    std::cout << COLOR_BOLD_YELLOW
-                              << " " << grid[r][c] << " "
-                              << COLOR_RESET;
-                }
-                else {
-                    std::cout << COLOR_BOLD_GREEN
-                              << " " << grid[r][c] << " "
-                              << COLOR_RESET;
-                }
+                else if (fixed[r][c])
+                    std::cout << COLOR_BOLD_YELLOW << " " << grid[r][c] << " " << COLOR_RESET;
+                else
+                    std::cout << COLOR_BOLD_GREEN << " " << grid[r][c] << " " << COLOR_RESET;
 
-                if ((c + 1) % boxC == 0) {
+                if ((c + 1) % boxC == 0)
                     std::cout << COLOR_CYAN << "|" << COLOR_RESET;
-                }
             }
 
             std::cout << "\n";
 
-            if ((r + 1) % boxR == 0) {
+            if ((r + 1) % boxR == 0)
                 printDivider();
-            }
-        }
-
-        // Show last message (errors, etc.)
-        if (!lastMessage.empty()) {
-            std::cout << "\n    " << COLOR_RED
-                      << lastMessage << COLOR_RESET;
-            lastMessage = "";
-        }
-        else {
-            std::cout << "\n";
         }
 
         std::cout << "\n";
     }
 
+
+
+
     /*
-     * === MAIN GAME LOOP ===
+     * playGame()
      *
-     * Handles:
-     * - Input parsing
-     * - Validation
-     * - Updating grid
-     * - Rendering
+     * MAIN GAME LOOP:
+     * Handles input → validation → update → redraw cycle
      */
+
+
+
     bool playGame() {
         while (!isSolved()) {
             displayBoard();
 
-            // Instructions
-            std::cout << COLOR_WHITE
-                      << "    Enter move (Row Col Value)\n"
+            std::cout << COLOR_WHITE << boardP
+                      << "Enter move (Row Col Value) e.g., '1 3 5'.\n"
                       << COLOR_RESET;
 
-            std::cout << COLOR_DIM
-                      << "    Example: 1 3 5\n"
-                      << "    Enter '0 0 0' to quit.\n"
+            std::cout << COLOR_DIM << boardP
+                      << "Enter '0 0 0' to quit.\n"
                       << COLOR_RESET;
 
-            std::cout << COLOR_WHITE
-                      << "\n    Your move: "
-                      << COLOR_RESET;
+            std::cout << COLOR_WHITE << "\n" << boardP
+                      << "Your move: " << COLOR_RESET;
 
-            /*
-             * TERMINAL MODE HANDLING:
-             * Ensures proper input behavior (canonical mode + echo)
-             */
             struct termios cooked, raw;
             tcgetattr(STDIN_FILENO, &cooked);
             raw = cooked;
@@ -401,109 +463,59 @@ public:
 
             tcsetattr(STDIN_FILENO, TCSANOW, &raw);
 
-            /*
-             * INPUT PARSING
-             */
             std::stringstream ss(input);
             int r, c, val;
 
             if (ss >> r >> c >> val) {
 
-                // Quit condition
-                if (r == 0 && c == 0 && val == 0)
+                if (r == 0 && c == 0 && val == 0) {
+                    g_minigameForfeited = true;
+                    showEndScreen(false);
                     return false;
+                }
 
-                // Convert to 0-based indexing
                 r--; c--;
 
-                // Bounds check
                 if (r < 0 || r >= size || c < 0 || c >= size) {
                     lastMessage = "Invalid row or column!";
                     continue;
                 }
 
-                // Value check
                 if (val < 0 || val > size) {
-                    lastMessage =
-                        "Value must be between 1 and "
-                        + std::to_string(size)
-                        + " (or 0 to clear).";
+                    lastMessage = "Invalid value!";
                     continue;
                 }
 
-                // Prevent editing fixed cells
                 if (fixed[r][c]) {
-                    lastMessage =
-                        "You can't change a fixed number!";
+                    lastMessage = "You can't change a fixed number!";
                     continue;
                 }
 
-                // Clear cell
                 if (val == 0) {
                     grid[r][c] = 0;
-                }
-                else {
-                    // Temporarily clear to check validity
+                } else {
                     int temp = grid[r][c];
                     grid[r][c] = 0;
 
                     if (isSafe(r, c, val)) {
                         grid[r][c] = val;
-                    }
-                    else {
+                    } else {
                         grid[r][c] = temp;
-                        lastMessage =
-                            "Invalid move! Conflict detected.";
+                        lastMessage = "Invalid move!";
                     }
                 }
-            }
-            else {
-                lastMessage =
-                    "Enter 3 numbers separated by spaces.";
+            } else {
+                lastMessage = "Invalid input format.";
             }
         }
 
-        /*
-         * WIN SCREEN
-         */
-        lastMessage = "";
-        displayBoard();
-
-        std::cout << "\n" << COLOR_BOLD_GREEN
-                  << "    ╔══════════════════════════════════╗\n"
-                  << "    ║  🎉 Board Filled!               ║\n"
-                  << "    ╚══════════════════════════════════╝\n"
-                  << COLOR_RESET;
-
-        std::cout << "\n"
-                  << COLOR_DIM
-                  << "    Press ENTER to continue..."
-                  << COLOR_RESET;
-
-        // Wait for user input
-        struct termios cooked, raw;
-        tcgetattr(STDIN_FILENO, &cooked);
-        raw = cooked;
-        cooked.c_lflag |= (ICANON | ECHO);
-        tcsetattr(STDIN_FILENO, TCSANOW, &cooked);
-
-        std::string dummy;
-        std::getline(std::cin, dummy);
-
-        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-
+        showEndScreen(true);
         return true;
     }
 };
 
-/*
- * === EXTERNAL ENTRY POINT ===
- *
- * This function allows integration with the rest of TermiCraft.
- * Simply call runSudoku(diff) to start the game.
- */
+// External entry point for engine
 bool runSudoku(Difficulty diff) {
     SudokuGame game(diff);
     return game.playGame();
 }
-```
