@@ -8,6 +8,8 @@
 | Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation |
 | Koki | 3036505795 | Player controller, mining system, crafting system |
 | Nan | 3036475225 | Minesweeper implementation, Twentyfour implementation |
+| Saarim | 3036520068 | Main game logic, menu, integration of minigames, display, types, save file, makefile|
+| Mohit | 3036517750 | World generation, fog of war, day and night(setting) |
 
 ---
 
