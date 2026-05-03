@@ -1,11 +1,23 @@
-/*
- * types.h
- *
- * Shared data structures for TermiCraft — everyone includes this.
- * If you're adding new structs or enums, put them here so the whole team can use them.
- * Sheikh Mohammad Saarim
- * DON'T modify existing structs without telling the group chat first.
- */
+// =============================================================================
+// types.h
+// TermiCraft — Shared Types, Structs & Constants
+//
+// All enums, structs, and world constants are here so there's no duplication
+// across modules.
+//
+// Contents:
+//   - World constants     WORLD_WIDTH, WORLD_HEIGHT, depth layer thresholds
+//   - Enums               BlockType, MaterialTier, GamePhase, Difficulty,
+//                         MinigameType, EventType
+//   - Structs             Position, Block, Inventory, Equipment, Player,
+//                         Enemy, RandomEvent, HighScore, DifficultySettings,
+//                         GameState
+//   - Inline helpers      getBlockChar(), getBlockColor(), getMaterialColor(),
+//                         getMaterialName(), getDifficultySettings()
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: <vector>, <string>, <ctime>
+// =============================================================================
 
 #ifndef TYPES_H
 #define TYPES_H
