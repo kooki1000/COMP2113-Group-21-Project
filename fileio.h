@@ -1,8 +1,17 @@
-/*
- * fileio.h
- * SHEIKH SAARIM
- * Save/load system and high score handling and writing game state to disk and reading it back.
- */
+// =============================================================================
+// fileio.h
+// TermiCraft — Save, Load & High Score Interface
+//
+// Public interface for the file I/O system. Include this anywhere you need
+// to save the game, load a save, or interact with the high score list.
+//
+// Default filenames (defined here so every module uses the same paths):
+//   SAVE_FILE   — "termicraft_save.dat"
+//   SCORES_FILE — "termicraft_highscores.dat"
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: types.h
+// =============================================================================
 
 #ifndef FILEIO_H
 #define FILEIO_H
