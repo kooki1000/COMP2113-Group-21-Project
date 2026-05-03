@@ -46,7 +46,7 @@ std::vector<std::string> evaluator::shunting_yard(const std::string& expression)
     std::vector<std::string> output;
     std::stack<char> operators;
     std::string multidigit;
-    for(int i = 0; i<expression.length(); i++){
+    for (size_t i = 0; i < expression.length(); i++){
         char c = expression[i];
         if (std::isspace(static_cast<unsigned char>(c))) {
             continue;
@@ -103,7 +103,7 @@ bool evaluator::checkNumbersUsed(const std::string expression, std::vector<int> 
     std::vector<std::string> rpn = shunting_yard(expression);
     std::vector<int> usedNumbers;
     for (const std::string& token : rpn) {
-        if (std::isdigit(token[0])) {
+        if (!token.empty() && std::isdigit(static_cast<unsigned char>(token[0]))) {
             usedNumbers.push_back(std::stoi(token));
         }
     }
