@@ -5,10 +5,32 @@
 | Name | Student ID | Role |
 | :--- | :--- | :--- |
 | Sohan | 3036636025 | Boss fight, score system |
-| Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation|
+| Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation |
+| Koki | 3036505795 | Player controller, mining system, crafting system |
+
 ---
 
 ## Features Implemented
+
+### Player Controller & Mining System (`player.h`, `player.cpp`)
+
+Implements the core player entity with real-time keyboard input handling (WASD movement, SPACE mining), physics simulation (gravity fall when standing over air), and combat mechanics. Manages the strict equipment progression system, triggers minigames during mining attempts based on calculated probability, and handles dynamic enemy spawning from disturbed blocks.
+
+**How coding elements are met:**
+
+- **Random events (Element 1):** Enemy spawning uses `rand() % 100` against `enemySpawnChance` settings after each successful mine. Mining minigame triggers use a calculated probability formula (`baseChance * (MINIGAME_COUNT / NUM_DISTINCT_ORES)`) with random rolls in the range [10%, 16%] to determine if a challenge occurs; dragon caves always trigger challenges regardless of roll.
+
+- **Data structures (Element 2):** Defines and manipulates `GameState` references containing `Position`, `Inventory`, `Equipment`, and `Enemy` structs. Uses `std::vector<Enemy>` to dynamically track active cave enemies with their health, position, and damage stats.
+
+- **Dynamic memory management (Element 3):** Enemy entities are dynamically added to the game world via `state.enemies.push_back(e)` when spawn conditions are met after mining. The vector automatically handles memory allocation for the enemy pool; no manual `new`/`delete` is required.
+
+- **File I/O (Element 4):** Integrates with the score system by calling `addScore()` from `score.h` upon successful mining, which delegates to `fileio` for persistent high score storage. Does not perform direct file operations, maintaining clean separation of concerns.
+
+- **Multiple files (Element 5):** Split across `player.h` (interface) and `player.cpp` (implementation). Integrates with `types.h` (shared state), `colors.h` (rendering), `menu.h` (UI utilities), `crafting.h` (equipment checks), and `score.h` (persistence). The minigame initialization uses `std::shuffle` from `<algorithm>` on a static array of minigame types.
+
+- **Difficulty levels (Element 6):** Reads difficulty settings from `GameState` to scale enemy health (`enemyHealthMult`), minigame damage (`minigameDamage`), and spawn rates. Tool requirements for mining blocks create a soft difficulty curve (hands → wood → stone → iron → gold → diamond), while dragon cave blocks remain accessible regardless of tier, providing risk/reward choices on higher difficulties.
+
+---
 
 ### Final Boss Fight (`final_fight.h`, `final_fight.cpp`)
 
@@ -88,6 +110,18 @@ where `getTopHighScore()` would otherwise return the score just written.
 - **Multiple files (Element 5):** `score.h` exposes only the two public
   functions. `player.cpp` and `final_fight.cpp` both include `score.h` and
   call `addScore()` — the multiplier logic exists in exactly one place.
+
+### Crafting & Equipment System (`crafting.h`, `crafting.cpp`)
+
+Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes (Wood through Diamond for pickaxes and armor). Implements strict progression gating where Iron, Gold, and Diamond upgrades trigger "Rite of Passage" minigames before completion. Features real-time resource validation, color-coded availability indicators, and detailed inventory display with health bonuses for armor upgrades.
+
+**How coding elements are met:**
+
+- **Data structures (Element 2):** Uses a static constant array of `CraftingRecipe` structs (10 entries) defining resource costs, prerequisites, and display metadata. Validates against `Inventory` and `Equipment` structs from `types.h` to determine craftability. Equipment tiers are enforced via the `MaterialTier` enum.
+
+- **Multiple files (Element 5):** Modular design with `crafting.h` exposing the menu interface and `crafting.cpp` containing UI rendering and validation logic. Integrates with `player.h` for progression checks (`checkCraftingProgression`, `performCrafting`), `colors.h` for ANSI color coding, and `menu.h` for terminal input handling (`getch`, `clearScreen`).
+
+- **Difficulty levels (Element 6):** Equipment crafting follows strict tier progression (Wood→Stone→Iron→Gold→Diamond). Iron, Gold, and Diamond upgrades require completing minigame challenges (Wordle/Minesweeper) via the player module before the upgrade applies, effectively gating high-tier content behind skill-based challenges that scale with the desired equipment level. Armor upgrades provide incremental max health bonuses (+5 to +40 HP) that aid survival on higher difficulties.
 
 ---
 
