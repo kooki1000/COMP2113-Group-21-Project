@@ -42,7 +42,7 @@
 #include "fileio.h"          // getTopHighScore() — used in showScoreBreakdown()
 #include "colors.h"          // ANSI color defines — used in showScoreBreakdown() (post-ncurses)
 
-// ncurses must come BEFORE any header that declares getch() with a different signature
+
 #include <ncurses.h>         // full ncurses API — rendering, input, color pairs
 #include <algorithm>         // std::max, std::min
 #include <string>            // std::string
@@ -69,6 +69,7 @@
 #define CP_HP_R    12
 #define CP_DIM     13
 #define CP_WARN    14
+
 
 /*
  * initFightColors
@@ -101,6 +102,7 @@ static void initFightColors() {
     init_pair(CP_DIM,     COLOR_WHITE,   -1);
     init_pair(CP_WARN,    COLOR_RED,     -1);
 }
+
 
 // =============================================================================
 // Dragon ASCII art — 3 phase variants
@@ -179,6 +181,7 @@ static int ROW_DRAG_START, ROW_DRAG_END;
 static int ROW_PLAYER, ROW_PLR_HP, ROW_BOT_SEP, ROW_CTRL;
 static int DRAG_MIN_X, DRAG_MAX_X;
 
+
 /*
  * computeLayout
  * Reads the current terminal dimensions via ncurses getmaxyx() and calculates
@@ -222,6 +225,7 @@ static void computeLayout() {
  * Inputs:  none (uses NC_COLS, ROW_TOP_SEP, ROW_BOT_SEP layout globals)
  * Outputs: none (side effect: draws to stdscr, requires refresh() to display)
  */
+
 static void drawFrame() {
     attron(COLOR_PAIR(CP_BORDER) | A_BOLD);
     box(stdscr, 0, 0);
@@ -248,6 +252,7 @@ static void drawFrame() {
  *   maxV  - maximum value (starting HP); clamped to 1 if 0 to avoid division
  * Outputs: none (side effect: draws to stdscr, requires refresh() to display)
  */
+
 static void drawBar(int row, int col, int width, int cur, int maxV) {
     if (maxV <= 0) maxV = 1;
     if (cur < 0)  cur  = 0;
@@ -282,6 +287,7 @@ static void drawBar(int row, int col, int width, int cur, int maxV) {
  *   dragon - current Dragon struct (reads hp, maxHp, phase)
  * Outputs: none (side effect: draws to stdscr rows ROW_HUD and ROW_DRAG_HP)
  */
+
 static void renderHUD(int score, const Dragon& dragon) {
     // Left: title
     attron(COLOR_PAIR(CP_TITLE) | A_BOLD);
@@ -336,6 +342,8 @@ static void renderHUD(int score, const Dragon& dragon) {
  *   hitFlash - true for 4 ticks after an arrow hits the dragon
  * Outputs: none (side effect: draws to stdscr rows ROW_DRAG_START onward)
  */
+
+
 static void renderDragon(const Dragon& dragon, int tick, bool hitFlash) {
     const char** art = DRAGON_ART[dragon.phase - 1];
     int cpair = (dragon.phase == FF_PHASE1) ? CP_DRAG_P1 :
@@ -371,6 +379,7 @@ static void renderDragon(const Dragon& dragon, int tick, bool hitFlash) {
  *   arrows - arrow pool array (FF_MAX_ARROWS entries)
  * Outputs: none (side effect: draws to stdscr combat zone rows)
  */
+
 static void renderProjectiles(const Fireball* fbs, const Arrow* arrows) {
     attron(COLOR_PAIR(CP_FIRE) | A_BOLD);
     for (int i = 0; i < FF_MAX_FIREBALLS; i++) {
@@ -401,6 +410,7 @@ static void renderProjectiles(const Fireball* fbs, const Arrow* arrows) {
  * Inputs:  armor - MaterialTier enum value (from types.h)
  * Outputs: const char* — "Stone", "Iron", "Gold", "Diamond", or "None"
  */
+
 static const char* getArmorName(MaterialTier armor) {
     switch (armor) {
         case MATERIAL_STONE:   return "Stone";
@@ -426,6 +436,7 @@ static const char* getArmorName(MaterialTier armor) {
  *   armor       - MaterialTier (for color and label in HP row)
  * Outputs: none (side effect: draws to stdscr rows ROW_PLAYER and ROW_PLR_HP)
  */
+
 static void renderPlayer(int playerX, int playerHp, int playerMaxHp, MaterialTier armor) {
     const char* sprite = "[/\\=====/\\]";
     int slen = (int)strlen(sprite);
@@ -459,6 +470,7 @@ static void renderPlayer(int playerX, int playerHp, int playerMaxHp, MaterialTie
  * Inputs:  none (uses ROW_CTRL layout global)
  * Outputs: none (side effect: draws to stdscr row ROW_CTRL)
  */
+
 static void renderControls() {
     attron(COLOR_PAIR(CP_DIM) | A_DIM);
     mvprintw(ROW_CTRL, 2,
@@ -480,6 +492,7 @@ static void renderControls() {
  * Inputs:  dragon - current Dragon struct (reads announceTicks, phase, enraged)
  * Outputs: none (side effect: may draw one banner row to stdscr combat zone)
  */
+
 static void renderBanners(const Dragon& dragon) {
     // Phase / enrage announcement — flash for announceTicks frames
     if (dragon.announceTicks > 0) {
@@ -519,6 +532,7 @@ static void renderBanners(const Dragon& dragon) {
  *   roarDmg      - HP taken from opening roar (shown in message)
  * Outputs: none (side effect: draws one full frame to stdscr and calls refresh)
  */
+
 static void renderOpening(int playerX, int playerHp, int playerMaxHp,
                           int score, const Dragon& dragon,
                           MaterialTier armor, int openingTicks, int roarDmg) {
@@ -612,6 +626,8 @@ static void renderOpening(int playerX, int playerHp, int playerMaxHp,
  *   hitFlash    - true for 4 ticks after an arrow hits (for renderDragon flash)
  * Outputs: none (side effect: full terminal repaint via ncurses refresh())
  */
+
+
 static void renderFrame(const Dragon& dragon, const Fireball* fbs, const Arrow* arrows,
                         int playerX, int playerHp, int playerMaxHp,
                         int score, MaterialTier armor, int tick, bool hitFlash) {
@@ -640,6 +656,7 @@ static void renderFrame(const Dragon& dragon, const Fireball* fbs, const Arrow* 
  *                  player.maxHealth, score)
  * Outputs: none (side effect: blocks on getch(), draws to stdscr)
  */
+
 static void showIntro(const GameState& state) {
     erase();
     int artStart = (NC_ROWS / 2) - 9;
@@ -691,12 +708,11 @@ static void showIntro(const GameState& state) {
     nodelay(stdscr, TRUE);
 }
 
-// ── Score breakdown (post-fight, ANSI — ncurses already torn down) ────────
-
+// ── Score breakdown ──────────────────────────────────────────────────────
 /*
  * showScoreBreakdown
- * Displays the post-fight score breakdown screen using ANSI escape codes
- * (ncurses has already been torn down by the time this is called).
+ * Displays the post-fight score breakdown screen using ANSI escape codes.
+ * ncurses has already been torn down by the time this is called.
  * Shows a large ASCII art "YOU WIN" or "GAME OVER" banner, then a bordered
  * table with: mining score carried in, hits per phase with multiplied totals,
  * kill bonus (if applicable), and the final total. Flags a new high score
@@ -715,72 +731,104 @@ static void showIntro(const GameState& state) {
  */
 static void showScoreBreakdown(bool won, int miningSnap, int p1h, int p2h, int p3h,
                                 bool killBonus, int total, float mult) {
-    std::cout << "\033[2J\033[H";  // clear screen
+    // art(7) + gap(1) + table(~10) + gap(1) + prompt(1) = ~20
+    clearAndCenterV(20);
+
+    // Art widths (display cols): YOU WIN ~63, GAME OVER ~80
+    std::string Aw = hpad(63);
+    std::string Ag = hpad(80);
+    // Table: ╔55═╗ = 57 display cols
+    std::string Tb = hpad(57);
+
     if (won) {
-        std::cout << "\033[1;32m\n"
-            "   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗██╗\n"
-            "   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║██║\n"
-            "    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║██║\n"
-            "     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║██║\n"
-            "      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██║\n"
-            "      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝\n"
+        std::cout << "\033[1;32m"
+            << Aw << "   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗██╗\n"
+            << Aw << "   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║██║\n"
+            << Aw << "    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║██║\n"
+            << Aw << "     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║██║\n"
+            << Aw << "      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██║\n"
+            << Aw << "      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝\n"
             "\033[0m\n";
     } else {
-        std::cout << "\033[1;31m\n"
-            "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗\n"
-            "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗\n"
-            "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝\n"
-            "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗\n"
-            "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║\n"
-            "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝\n"
+        std::cout << "\033[1;31m"
+            << Ag << "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗\n"
+            << Ag << "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗\n"
+            << Ag << "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝\n"
+            << Ag << "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗\n"
+            << Ag << "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║\n"
+            << Ag << "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝\n"
             "\033[0m\n";
     }
 
-    std::cout << "\033[1;36m"
-        "  ╔═══════════════════════════════════════╗\n"
-        "  ║          SCORE  BREAKDOWN             ║\n"
-        "  ╠═══════════════════════════════════════╣\n"
-        "\033[0m";
+    const int IW = 54;
+    // Inner table width: 54 visible columns inside the left/right borders.
+    // Tp adds the left padding needed to centre the whole table on screen.
+    std::string Tp = hpad(IW + 2);
 
-    char buf[64];
-    auto row = [&](const char* label, int val) {
-        std::snprintf(buf, sizeof(buf), "  ║  %-28s %6d  ║\n", label, val);
-        std::cout << buf;
+    // lc/rc are the left and right border characters for each table edge.
+    // IW controls how many horizontal line characters get drawn between them.
+    auto hbar = [&](const char* lc, const char* rc) {
+        std::cout << "\033[1;36m" << Tp << lc;
+        for (int i = 0; i < IW; i++) std::cout << "\xe2\x95\x90";
+        std::cout << rc << "\033[0m\n";
     };
-    row("Mining score (carried in):", miningSnap);
+    // text is the message to centre, color is the ANSI style applied to it.
+    // l and r are the left/right padding counts that keep the text centred.
+    auto centerRow = [&](const char* text, const char* color) {
+        int tlen = (int)strlen(text);
+        int l = (IW - tlen) / 2, r = IW - tlen - l;
+        std::cout << color << Tp << "\xe2\x95\x91"
+                  << std::string(l, ' ') << text << std::string(r, ' ')
+                  << "\xe2\x95\x91\033[0m\n";
+    };
+    char buf[80];
+    // label is the left description, val is the right-side number, and color
+    // controls the row style. The snprintf width keeps the number column aligned.
+    auto dataRow = [&](const char* label, int val, const char* color) {
+        std::snprintf(buf, sizeof(buf), "   %-35s %12d   ", label, val);
+        std::string s(buf);
+        while ((int)s.size() < IW) s += ' ';
+        if ((int)s.size() > IW) s = s.substr(0, IW);
+        std::cout << color << Tp << "\xe2\x95\x91" << s << "\xe2\x95\x91\033[0m\n";
+    };
+
+    hbar("\xe2\x95\x94", "\xe2\x95\x97");
+    centerRow("SCORE BREAKDOWN", "\033[1;36m");
+    hbar("\xe2\x95\xa0", "\xe2\x95\xa3");
+
+    dataRow("Mining score (carried in):", miningSnap, "\033[1;36m");
     if (p1h > 0) {
-        char lbl[40];
+        char lbl[50];
         std::snprintf(lbl, sizeof(lbl), "Phase I   hits: %3d x %2d =", p1h, FF_SCORE_HIT_P1);
-        row(lbl, (int)(p1h * FF_SCORE_HIT_P1 * mult));
+        dataRow(lbl, (int)(p1h * FF_SCORE_HIT_P1 * mult), "\033[1;36m");
     }
     if (p2h > 0) {
-        char lbl[40];
+        char lbl[50];
         std::snprintf(lbl, sizeof(lbl), "Phase II  hits: %3d x %2d =", p2h, FF_SCORE_HIT_P2);
-        row(lbl, (int)(p2h * FF_SCORE_HIT_P2 * mult));
+        dataRow(lbl, (int)(p2h * FF_SCORE_HIT_P2 * mult), "\033[1;36m");
     }
     if (p3h > 0) {
-        char lbl[40];
+        char lbl[50];
         std::snprintf(lbl, sizeof(lbl), "Phase III hits: %3d x %2d =", p3h, FF_SCORE_HIT_P3);
-        row(lbl, (int)(p3h * FF_SCORE_HIT_P3 * mult));
+        dataRow(lbl, (int)(p3h * FF_SCORE_HIT_P3 * mult), "\033[1;36m");
     }
     if (killBonus)
-        row("Dragon kill bonus:", (int)(FF_SCORE_KILL * mult));
+        dataRow("Dragon kill bonus:", (int)(FF_SCORE_KILL * mult), "\033[1;36m");
 
-    std::cout << "\033[1;36m"
-        "  ╠═══════════════════════════════════════╣\n"
-        "\033[0m";
-    std::snprintf(buf, sizeof(buf), "  ║  %-28s %6d  ║\n", "TOTAL SCORE:", total);
-    std::cout << "\033[1;33m" << buf << "\033[0m";
+    hbar("\xe2\x95\xa0", "\xe2\x95\xa3");
+    dataRow("TOTAL SCORE:", total, "\033[1;33m");
 
     HighScore existing = getTopHighScore();
     if (total > existing.score)
-        std::cout << "\033[1;32m  ║           ** NEW HIGH SCORE! **        ║\n\033[0m";
+        centerRow("** NEW HIGH SCORE! **", "\033[1;32m");
 
-    std::cout << "\033[1;36m"
-        "  ╚═══════════════════════════════════════╝\n"
-        "\033[0m\n";
+    hbar("\xe2\x95\x9a", "\xe2\x95\x9d");
+    std::cout << "\n";
 
-    std::cout << "\033[2m  Press any key to continue...\033[0m";
+    {
+        const char* prompt = "Press any key to continue...";
+        std::cout << hpad((int)strlen(prompt)) << "\033[2m" << prompt << "\033[0m";
+    }
     std::cout.flush();
     char dummy; read(STDIN_FILENO, &dummy, 1);
 }
@@ -801,6 +849,7 @@ static void showScoreBreakdown(bool won, int miningSnap, int p1h, int p2h, int p
  *   Normal: fireRateTicks=18 ≈ 0.9 s,  dragonSpeed=2, no enrage
  *   Hard:   fireRateTicks=12 ≈ 0.6 s,  dragonSpeed=3, enrage at 50 %
  */
+
 BossConfig initBossConfig(Difficulty diff) {
     BossConfig cfg = {};
     switch (diff) {
@@ -841,6 +890,7 @@ BossConfig initBossConfig(Difficulty diff) {
  *   calcFightHP(DIFF_NORMAL, MATERIAL_GOLD)    → 15 + 50 = 65
  *   calcFightHP(DIFF_HARD,   MATERIAL_NONE)    → 10 +  0 = 10
  */
+
 int calcFightHP(Difficulty diff, MaterialTier armor) {
     int base = (diff == DIFF_EASY) ? FF_BASE_HP_EASY :
                (diff == DIFF_HARD) ? FF_BASE_HP_HARD : FF_BASE_HP_NORMAL;
@@ -868,6 +918,7 @@ int calcFightHP(Difficulty diff, MaterialTier armor) {
  *            GOLD                → FF_DMG_GOLD    (7)
  *            DIAMOND             → FF_DMG_DIAMOND (12)
  */
+
 int calcArmorDamage(MaterialTier armor) {
     switch (armor) {
         case MATERIAL_IRON:    return FF_DMG_IRON;
@@ -887,6 +938,7 @@ int calcArmorDamage(MaterialTier armor) {
  * Inputs:  cfg - BossConfig (reads dragonHp and dragonSpeed)
  * Outputs: Dragon struct with all fields initialised
  */
+
 static Dragon initDragon(const BossConfig& cfg) {
     Dragon d = {};
     d.x = FF_DRAGON_COLS;
@@ -912,6 +964,7 @@ static Dragon initDragon(const BossConfig& cfg) {
  *   baseSpeed - config.dragonSpeed from BossConfig (reference for speed calc)
  * Outputs: none (modifies dragon in place)
  */
+
 static void updatePhase(Dragon& dragon, int baseSpeed) {
     if (dragon.hp <= 0) return;
     int pct = dragon.hp * 100 / dragon.maxHp;
@@ -919,6 +972,7 @@ static void updatePhase(Dragon& dragon, int baseSpeed) {
                    (pct <= FF_PHASE2_PCT) ? FF_PHASE2 : FF_PHASE1;
     if (newPhase > dragon.phase) {
         dragon.phase = newPhase;
+        // Recompute from the base speed so phase speed stays deterministic.
         dragon.speed = baseSpeed + (dragon.phase - 1);
     }
 }
@@ -943,6 +997,7 @@ static void updatePhase(Dragon& dragon, int baseSpeed) {
  *   spread3 - outer spread columns for Phase 3 (from BossConfig.spread3)
  * Outputs: none (modifies fbs in place)
  */
+
 static void spawnFireballs(Fireball* fbs, const Dragon& dragon, int spread3) {
     int cx     = dragon.x + FF_DRAGON_COLS / 2;
     int spawnY = ROW_DRAG_END + 1;
@@ -980,6 +1035,7 @@ static void spawnFireballs(Fireball* fbs, const Dragon& dragon, int spread3) {
  *   playerX - column to spawn the arrow at (player's centre)
  * Outputs: none (modifies arrows in place)
  */
+
 static void fireArrow(Arrow* arrows, int playerX) {
     for (int i = 0; i < FF_MAX_ARROWS; i++) {
         if (!arrows[i].active) {
@@ -988,6 +1044,7 @@ static void fireArrow(Arrow* arrows, int playerX) {
         }
     }
 }
+
 
 // ── runBossFight — main entry point ───────────────────────────────────────
 
@@ -1015,7 +1072,6 @@ static void fireArrow(Arrow* arrows, int playerX) {
  *   8. endwin() — restore terminal before ANSI output
  *   9. Set state.dragonDefeated and state.phase before returning
  *  10. showScoreBreakdown() — post-fight ANSI score table
- *  11. saveFinalScore() — name + leaderboard save via score.cpp / fileio.cpp
  *
  * Fireball damage to player is reduced by armorPct (10/20/30/45 % per tier).
  * Opening roar deals difficulty-scaled damage also reduced by armorPct.
@@ -1029,6 +1085,8 @@ static void fireArrow(Arrow* arrows, int playerX) {
  *          false = player died, fled, or terminal too small
  *                → state.phase = PHASE_GAMEOVER
  */
+
+ 
 bool runBossFight(GameState& state) {
     setlocale(LC_ALL, "");  // enable UTF-8 in ncurses
     // Init ncurses
@@ -1088,10 +1146,12 @@ bool runBossFight(GameState& state) {
     roarDmg = roarDmg * (100 - armorPct) / 100;
     if (roarDmg < 5) roarDmg = 5;
 
+    // Countdown until the first fireball volley after the opening sequence.
     int  fireballTick    = -20;  // 20-tick grace after opening before first volley
     int  currentFireRate = config.fireRateTicks;
     int  tick            = 0;
     int  flashTicks      = 0;
+    // Opening animation runs from 50 down to 0, then the normal fight begins.
     int  openingTicks    = 50;   // locked dramatic entry sequence
     bool running         = true;
 
@@ -1209,6 +1269,7 @@ bool runBossFight(GameState& state) {
         if (config.hasEnrage && !dragon.enraged && dragon.hp > 0 &&
             dragon.hp * 100 / dragon.maxHp <= 50) {
             dragon.enraged    = true;
+            // Enrage is a one-time difficulty spike: faster movement and shots.
             dragon.speed     += 3;
             currentFireRate   = std::max(5, currentFireRate / 2);
             dragon.announceTicks = 40;  // 2 seconds of banner
@@ -1234,6 +1295,5 @@ bool runBossFight(GameState& state) {
 
     showScoreBreakdown(won, miningSnap, p1h, p2h, p3h,
                        killBonus, state.score, state.settings.scoreMultiplier);
-    saveFinalScore(state, won);
     return won;
 }
