@@ -4,16 +4,53 @@
 
 | Name | Student ID | Role |
 | :--- | :--- | :--- |
-| Sohan | 3036636025 | Boss fight, score system |
-| Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation |
-| Koki | 3036505795 | Player controller, mining system, crafting system |
-| Nan | 3036475225 | Minesweeper implementation, Twentyfour implementation |
-| Saarim | 3036520068 | Main game logic, menu, integration of minigames, display, types, save file, makefile|
-| Mohit | 3036517750 | World generation, fog of war, day and night(setting) |
+| Sohan Gupta Thedla | 3036636025 | Boss fight, score system |
+| Aryan Sokhiya | 3036484587 | Wordle Implementation, Sudoku Implementation |
+| Koki Ukai | 3036505795 | Player controller, mining system, crafting system |
+| Nan Jiang | 3036475225 | Minesweeper implementation, TwentyFour implementation |
+| Sheikh Mohammad Saarim | 3036520068 | Main game logic, menu, integration of minigames, display, types, save file, makefile |
+| Mohit Reddy Vuyyuru | 3036517750 | World generation, fog of war, day and night(setting) |
 
 ---
 
-## Features Implemented
+## Game Overview
+
+TermiCraft is a 2D text-based survival and mining game played entirely in the terminal. Each run generates a fresh ASCII world with surface terrain, underground layers, and ore deposits. Players mine resources to craft progressively stronger tools and armor, and some crafting tiers trigger minigames (Wordle, Minesweeper, TwentyFour, Sudoku). The goal is to reach the dragon cave, defeat the final boss, and finish with the highest score.
+
+## Requirements
+
+- C++11 compiler (tested with `g++`)
+- `make`
+- `ncurses` development library
+- Terminal with ANSI support
+
+## Build and Run
+
+1. Build the game:
+
+  ```bash
+  make
+  ```
+
+2. Launch:
+
+  ```bash
+  ./termicraft
+  ```
+
+## Project Structure
+
+- `main.cpp` / `menu.cpp`: entry point, menus, and game loop coordination
+- `world_gen.cpp`, `fog_of_war.cpp`, `day_night.cpp`: world generation and visual systems
+- `player.cpp`, `crafting.cpp`: player movement, mining, crafting, and progression
+- `wordle.cpp`, `minesweeper.cpp`, `twentyfour.cpp`, `sudoku.cpp`: minigames
+- `final_fight.cpp`, `score.cpp`: boss fight and scoring system
+- `fileio.cpp`: save/load and high score persistence
+- `types.h`, `colors.h`: shared types and rendering utilities
+
+---
+
+## Implementation Summary
 
 ### Player Controller & Mining System (`player.h`, `player.cpp`)
 
@@ -33,72 +70,17 @@ Implements the core player entity with real-time keyboard input handling (WASD m
 
 - **Difficulty levels (Element 6):** Reads difficulty settings from `GameState` to set player starting health and minigame damage (`minigameDamage`). Tool requirements for mining blocks create a soft difficulty curve (hands → wood → stone → iron → gold → diamond), while dragon cave blocks remain accessible regardless of tier, providing risk/reward choices on higher difficulties.
 
----
-
-# TermiCraft — Final Boss Fight & Score System
+## Final Boss Fight and Score System
 
 **Author:** Sohan Gupta Thedla  
 **UID:** 3036636025  
 **Files:** `final_fight.h`, `final_fight.cpp`, `score.h`, `score.cpp`
 
----
-
-## Application Description
-
-TermiCraft is a 2D text-based survival and mining game playable entirely in the
-Linux terminal. Inspired by Minecraft and Terraria, the player navigates a
-procedurally generated ASCII world, mining resources to craft progressively
-better tools and armor, before descending into a dragon cave to fight the final
-boss.
-
-This module covers two responsibilities: the final boss fight (a Space
-Invaders-style dragon encounter rendered using ncurses) and the centralised
-score system used across the entire game by all modules.
+### Final Boss Fight (`final_fight.h` / `final_fight.cpp`)
 
 ---
 
-## File Descriptions
-
-### `final_fight.h`
-Header file declaring all constants, structs, and public function signatures for
-the boss fight. All arena dimensions, phase thresholds, HP bonuses, damage
-values, and score constants are defined here using `#define` so any value can be
-tuned without touching implementation code. Declares four custom structs:
-`BossConfig`, `Dragon`, `Fireball`, and `Arrow`. Intentionally does not redefine
-any type already declared in `types.h` — `Difficulty`, `MaterialTier`, and
-`HighScore` are all used directly from the team's shared header.
-
-### `final_fight.cpp`
-Full implementation of the boss fight sequence. Handles ncurses initialisation
-and teardown, dynamic layout computation from live terminal dimensions, 14
-colour pair registrations, the 50-tick opening animation with shockwave and roar
-damage, the main game loop (input draining, dragon movement, fireball spawning,
-arrow firing, collision detection, phase transitions, Hard-mode enrage), and the
-post-fight ANSI score breakdown screen. ncurses is initialised inside
-`runBossFight()` and torn down with `endwin()` before returning, so the rest of
-the game's ANSI output is completely unaffected.
-
-### `score.h`
-Header file declaring the two public scoring functions: `addScore()` and
-`saveFinalScore()`. This is the single point of truth for all score increments
-across the entire codebase. Both the mining phase (`player.cpp`) and the boss
-fight (`final_fight.cpp`) call `addScore()` rather than modifying `state.score`
-directly, ensuring the difficulty multiplier is applied identically everywhere.
-
-### `score.cpp`
-Implements `addScore()` and `saveFinalScore()`. All file I/O for high scores is
-delegated entirely to `fileio.cpp` — `score.cpp` never opens or writes any
-files directly.
-
----
-
----
-
-# Part 1 — Final Boss Fight (`final_fight.h` / `final_fight.cpp`)
-
----
-
-## Overview
+#### Overview
 
 The player enters the dragon cave portal and is taken into a full-screen ncurses
 arena. A large ASCII dragon moves left and right across the top of the screen,
@@ -109,6 +91,7 @@ the player's HP reaches zero (defeat). The player can also press `Q` to flee,
 which counts as a loss but still saves their partial score.
 
 **Arena layout — adapts fully to terminal size via ncurses `getmaxyx`:**
+
 ```
 row 0       ╔══════════════════════════════════════════════╗
 row 1       ║  TERMICRAFT: THE LAIR  │ [PHASE I] │ SCORE  ║
@@ -125,7 +108,7 @@ row  H-1    ╚═════════════════════�
 
 ---
 
-## How Coding Elements Are Met
+#### How Coding Elements Are Met
 
 **Random events (Element 1):** Fireball spawn positions are derived from the
 dragon's live `x` position, which changes every tick as the dragon bounces
@@ -175,7 +158,7 @@ loop.
 
 ---
 
-## Features
+#### Features
 
 ### Three-Phase Dragon
 
@@ -252,9 +235,10 @@ to minimum 1 HP). The player can press `Q` to flee during the opening.
 
 ---
 
-## Function Reference — `final_fight.cpp`
+#### Function Reference — `final_fight.cpp`
 
 ### `initFightColors()`
+
 Registers 14 ncurses colour pairs after `start_color()`. Uses
 `use_default_colors()` so `-1` as the background preserves the terminal's own
 background colour. The 14 pairs cover: border (cyan), title (white), HUD
@@ -264,6 +248,7 @@ These pair IDs (`CP_BORDER` through `CP_WARN`) are referenced by every render
 function via `attron(COLOR_PAIR(...))`.
 
 ### `computeLayout()`
+
 Calls `getmaxyx(stdscr, NC_ROWS, NC_COLS)` to read the current terminal
 dimensions, then calculates all `ROW_*` globals and dragon movement bounds.
 The top rows are anchored from row 0 downward: HUD at row 1, dragon HP bar at
@@ -275,6 +260,7 @@ safety clamp so `DRAG_MAX_X` is always at least `DRAG_MIN_X + 4`. Called once
 at fight start and again whenever `getch()` returns `KEY_RESIZE`.
 
 ### `drawFrame()`
+
 Uses ncurses `box(stdscr, 0, 0)` to draw the outer border using terminal
 line-drawing characters. Then draws two internal horizontal separators using
 `mvhline()` with `ACS_HLINE`. Each separator's left and right endpoints are
@@ -283,6 +269,7 @@ replaced with `ACS_LTEE` and `ACS_RTEE` (the ╠ and ╣ characters) using
 border.
 
 ### `drawBar(row, col, width, cur, maxV)`
+
 Draws a filled HP bar of `width` characters at the given screen position.
 Computes `filled = cur * width / maxV` and `pct = cur * 100 / maxV`. Colour is
 chosen by percentage: `CP_HP_G` (green) above 50%, `CP_HP_Y` (yellow) above
@@ -292,6 +279,7 @@ print `'-'` with `CP_DIM | A_DIM`. Guards `maxV` against zero and clamps `cur`
 to zero if negative.
 
 ### `renderHUD(score, dragon)`
+
 Renders the top two rows of the arena. Row 1 has three sections: title
 `"TERMICRAFT: THE LAIR"` at column 2 in white bold; the current phase string
 `"[ PHASE I/II/III ]"` centred by computing
@@ -302,6 +290,7 @@ followed by a `drawBar()` call sized to `max(8, NC_COLS/2 - 16)`, then a
 `" NNN%  HP: current/max"` suffix.
 
 ### `renderDragon(dragon, tick, hitFlash)`
+
 Selects the art array via `DRAGON_ART[dragon.phase - 1]`, choosing `DRAGON_P1`,
 `DRAGON_P2`, or `DRAGON_P3`. Sets the colour pair to `CP_DRAG_P1/P2/P3`
 (green/yellow/red). For Phase 3, adds `A_BLINK` on alternating tick pairs
@@ -313,6 +302,7 @@ character starting at `1 + dragon.x`, clamped to `NC_COLS - 1`. Lines that
 would overlap `ROW_PLAYER - 2` are clipped.
 
 ### `renderProjectiles(fbs, arrows)`
+
 Iterates both projectile pools. For each active fireball, skips if its row is
 on or above `ROW_TOP_SEP` or on or below `ROW_PLAYER`, and skips if outside the
 border columns. Prints `'*'` at `(fbs[i].y, 1 + fbs[i].x)` in
@@ -321,6 +311,7 @@ border columns. Prints `'*'` at `(fbs[i].y, 1 + fbs[i].x)` in
 `+1` column offset accounts for the left border character.
 
 ### `renderPlayer(playerX, playerHp, playerMaxHp, armor)`
+
 Sprite is `"[/\=====/\]"`. Start column is `1 + playerX - strlen(sprite)/2`
 so the sprite is centred on `playerX`, then clamped to stay inside the border
 on both sides. Colour is chosen by HP percentage: `CP_PLAYER` (cyan) above 50%,
@@ -329,11 +320,13 @@ danger warning. Below the sprite, `"PLAYER"` label is printed followed by a
 `drawBar()` sized to `max(8, NC_COLS/3)`, then `" NNN%  [ArmorName armor]"`.
 
 ### `renderControls()`
+
 Prints `"[A] move left    [D] move right    [SPACE] shoot    [Q] flee"` at
 column 2 of `ROW_CTRL` using `CP_DIM | A_DIM` so it visually recedes behind
 the active fight elements.
 
 ### `renderBanners(dragon)`
+
 Only executes when `dragon.announceTicks > 0`. Computes
 `blink = (dragon.announceTicks / 5) % 2 == 0` so the banner alternates visible
 and invisible every 5 ticks (0.25 seconds). When visible, selects the message:
@@ -344,6 +337,7 @@ and invisible every 5 ticks (0.25 seconds). When visible, selects the message:
 `(NC_COLS - strlen(msg)) / 2`.
 
 ### `renderOpening(playerX, playerHp, playerMaxHp, score, dragon, armor, openingTicks, roarDmg)`
+
 Called once per tick during the 50-tick opening sequence. Computes
 `frame = 50 - openingTicks` (0–49). `radius = frame / 5` grows from 0 to the
 maximum that fits in the combat zone. The shockwave ring is drawn by iterating
@@ -354,6 +348,7 @@ For the first 10 frames, a 3×5 cluster at the arena centre alternates `'W'` and
 Player sprite and controls are always rendered so the HP drop is visible.
 
 ### `renderFrame(dragon, fbs, arrows, playerX, playerHp, playerMaxHp, score, armor, tick, hitFlash)`
+
 Composes one complete game frame by calling all sub-renderers in z-order:
 `erase()` to blank the previous frame, `drawFrame()`, `renderHUD()`,
 `renderDragon()`, `renderProjectiles()`, `renderPlayer()`, `renderControls()`,
@@ -362,6 +357,7 @@ pass. The erase-then-refresh pattern is what gives ncurses its flicker-free
 output.
 
 ### `showIntro(state)`
+
 Renders a full-screen ncurses intro. The Phase 1 dragon art is centred
 vertically at `NC_ROWS/2 - 9` and horizontally at `(NC_COLS - artWidth) / 2`,
 printed in `CP_DRAG_P3 | A_BOLD` (red bold). The `"~ THE DRAGON CAVE ~"` title
@@ -372,6 +368,7 @@ Then `nodelay(stdscr, FALSE)` is set so `getch()` blocks until the player presse
 any key, after which `nodelay(stdscr, TRUE)` is restored for the game loop.
 
 ### `showScoreBreakdown(won, miningSnap, p1h, p2h, p3h, killBonus, total, mult)`
+
 Called after `endwin()` so it uses ANSI escape codes via `std::cout` rather than
 ncurses. Uses `clearAndCenterV()` to vertically centre the content and `hpad()`
 to compute horizontal padding strings for centring each art block and the table.
@@ -384,6 +381,7 @@ beats the stored record and prints `"** NEW HIGH SCORE! **"` if so. Reads one
 keypress with `read(STDIN_FILENO, &dummy, 1)` to pause before returning.
 
 ### `initBossConfig(diff)`
+
 Switches on the `Difficulty` enum and fills a `BossConfig` struct. Easy:
 `dragonHp=50`, `fireballDmg=4`, `fireRateTicks=35`, `dragonSpeed=1`,
 `hasEnrage=false`, `spread3=FF_SPREAD_P3`. Normal: HP 80, dmg 9, rate 18,
@@ -391,6 +389,7 @@ speed 2, no enrage, standard spread. Hard: HP 140, dmg 15, rate 12, speed 3,
 `hasEnrage=true`, `spread3=8` (wider than the standard 5). Returns by value.
 
 ### `calcFightHP(diff, armor)`
+
 Reads the base HP constant for the difficulty (`FF_BASE_HP_EASY/NORMAL/HARD`),
 then adds the flat armor bonus constant (`FF_HP_BONUS_STONE/IRON/GOLD/DIAMOND`)
 for the given `MaterialTier`. `MATERIAL_NONE` and `MATERIAL_WOOD` fall through
@@ -398,12 +397,14 @@ to `bonus=0`. Returns `base + bonus` with no upper cap — armor always adds on
 top regardless of difficulty.
 
 ### `calcArmorDamage(armor)`
+
 A switch returning `FF_DMG_IRON` (4), `FF_DMG_GOLD` (7), or `FF_DMG_DIAMOND`
 (12) for the respective tiers. All other tiers (None, Wood, Stone) return
 `FF_DMG_DEFAULT` (1). This value is stored as `arrowDmg` in `runBossFight()` and
 applied as `dragon.hp -= arrowDmg` on every arrow hit.
 
 ### `initDragon(cfg)`
+
 Zero-initialises a `Dragon` struct with `= {}`, then sets: `x = FF_DRAGON_COLS`
 (one art-block-width from the left border), `y = ROW_DRAG_START`,
 `hp = maxHp = cfg.dragonHp`, `speed = cfg.dragonSpeed`, `direction = 1`
@@ -411,6 +412,7 @@ Zero-initialises a `Dragon` struct with `= {}`, then sets: `x = FF_DRAGON_COLS`
 `announceTicks = 0`. Returns by value.
 
 ### `updatePhase(dragon, baseSpeed)`
+
 Guards immediately if `dragon.hp <= 0`. Computes
 `pct = dragon.hp * 100 / dragon.maxHp`. Determines `newPhase` as `FF_PHASE3`
 if `pct <= 33`, `FF_PHASE2` if `pct <= 66`, else `FF_PHASE1`. Only applies
@@ -419,6 +421,7 @@ the transition if `newPhase > dragon.phase` (one-way only). On advance, sets
 so Phase 2 adds +1 and Phase 3 adds +2 above base.
 
 ### `spawnFireballs(fbs, dragon, spread3)`
+
 Computes the dragon's horizontal centre as `cx = dragon.x + FF_DRAGON_COLS / 2`.
 Spawn row is `ROW_DRAG_END + 1` (just below the dragon body). Builds arrays
 `spawnX[]` and `spawnDX[]` per phase: Phase 1 — one fireball at `cx`, `dx=0`;
@@ -429,17 +432,20 @@ struct literal assignment. If all slots are active, the volley is silently
 dropped.
 
 ### `fireArrow(arrows, playerX)`
+
 Iterates the `arrows` pool and activates the first inactive slot as
 `{playerX, ROW_PLAYER - 1, true}` (spawns one row above the player sprite).
 Returns immediately after activating one slot — one arrow per SPACE press.
 If all `FF_MAX_ARROWS` slots are active the shot is silently dropped.
 
 ### `getArmorName(armor)`
+
 Returns a `const char*` display string for each `MaterialTier`: `"Stone"`,
 `"Iron"`, `"Gold"`, `"Diamond"`, or `"None"` for all other values. Used in
 `renderPlayer()` for the HP bar suffix and in `showIntro()` for the stats line.
 
 ### `runBossFight(state)` — Main Entry Point
+
 The full sequence of execution inside this function:
 
 1. `setlocale(LC_ALL, "")` enables UTF-8 so ncurses renders Unicode box
@@ -509,11 +515,11 @@ The full sequence of execution inside this function:
 
 ---
 
-# Part 2 — Score System (`score.h` / `score.cpp`)
+### Score System (`score.h` / `score.cpp`)
 
 ---
 
-## Overview
+#### Overview
 
 The score system provides the single point of truth for all score increments in
 the game. Instead of each module applying the difficulty multiplier
@@ -524,7 +530,7 @@ actual file operations to `fileio.cpp`.
 
 ---
 
-## How Coding Elements Are Met
+#### How Coding Elements Are Met
 
 **Data structures (Element 2):** Uses the shared `HighScore` struct from
 `types.h` — no duplicate struct definitions. `saveFinalScore()` populates all
@@ -549,7 +555,7 @@ by the difficulty level.
 
 ---
 
-## Features
+#### Features
 
 ### Centralised Score Calculation
 
@@ -598,22 +604,26 @@ on death so the leaderboard records it honestly.
 
 ---
 
-## Function Reference — `score.cpp`
+#### Function Reference — `score.cpp`
 
 ### `addScore(state, rawPoints)`
+
 The sole function that increments `state.score` anywhere in the codebase during
 gameplay. First checks `if (rawPoints < 0) return` — a defensive guard
 preventing any negative call from modifying the score (zero is allowed through,
 which is harmless). Then computes:
+
 ```
 state.score += static_cast<int>(rawPoints * state.settings.scoreMultiplier)
 ```
+
 The `static_cast<int>` truncates the fractional remainder consistently — for
 example, 10 × 1.5 = 15 (no remainder); 7 × 1.5 = 10.5 → 10. This truncation
 pattern is consistent with the original inline calculation previously in
 `player.cpp` and with the rest of the codebase.
 
 ### `saveFinalScore(state, defeatedDragon)`
+
 End-of-run save flow:
 
 1. Reads `state.player.name` directly — no second prompt since the player
@@ -639,9 +649,9 @@ End-of-run save flow:
 
 ---
 
-## Non-Standard Libraries
+### Non-Standard Libraries
 
-### `ncurses` (`<ncurses.h>`)
+#### `ncurses` (`<ncurses.h>`)
 
 ncurses is the only non-standard library used across these modules. It is
 pre-installed on Ubuntu Linux and on the HKU CS academy server
@@ -678,7 +688,6 @@ required by the grader. `score.cpp` uses no external libraries.
 All other headers (`<unistd.h>`, `<locale.h>`, `<algorithm>`, `<cstdio>`,
 `<sstream>`, `<iomanip>`) are standard C/C++ headers requiring no installation.
 
-
 ### Crafting & Equipment System (`crafting.h`, `crafting.cpp`)
 
 Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes (Wood through Diamond for pickaxes and armor). Implements strict progression gating where pickaxe upgrades beyond Stone trigger a "Rite of Passage" minigame before the upgrade is confirmed. Features real-time resource validation, color-coded availability indicators, and detailed inventory display with health bonuses for armor upgrades.
@@ -693,7 +702,7 @@ Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes
 
 ---
 
-## Non-Standard Libraries
+### Non-Standard Libraries
 
 None. All libraries used by `final_fight.cpp` and `score.cpp` are standard
 on Linux and require no additional installation:
@@ -704,7 +713,7 @@ on Linux and require no additional installation:
 | `<unistd.h>` | `usleep()` for game tick timing, `read()`    |
 | `<ctime>`    | `time()` for high score timestamps           |
 
-Terminal rendering uses ANSI escape codes via the team's `colors.h` 
+Terminal rendering uses ANSI escape codes via the team's `colors.h`
 
 ### Wordle Minigame (`wordle.cpp`)
 
@@ -726,6 +735,7 @@ The target word is selected using `rand()` from a predefined vector of valid wor
 ---
 
 **Data structures (Element 2):**  
+
 - `std::vector<std::string>` for word banks and guess history  
 - A per-guess evaluation grid storing tile states  
 - A 26-element array tracking cumulative letter states (correct, present, absent)
@@ -746,6 +756,7 @@ This prevents incorrect duplicate scoring for repeated letters.
 
 **Multiple files (Element 5):**  
 The module is encapsulated and exposed through a single entry function. It integrates with:
+
 - `colors.h` for ANSI rendering  
 - `menu.h` for input handling consistency  
 
@@ -754,6 +765,7 @@ No external global state is required.
 ---
 
 **Difficulty levels (Element 6):**  
+
 - Easy: 4-letter words (small vocabulary, high frequency words)  
 - Normal: 5-letter words (balanced difficulty)  
 - Hard: 6-letter words (lower frequency vocabulary, higher deduction complexity)
@@ -771,6 +783,7 @@ A terminal-based constraint satisfaction puzzle integrated into TermiCraft. The 
 The system dynamically generates a valid Sudoku board at runtime using recursive backtracking, then removes values according to difficulty to create a playable puzzle. Each board is guaranteed to be solvable.
 
 The rendering system uses ANSI formatting to visually separate:
+
 - Fixed clues (non-editable)
 - Player inputs
 - Empty cells
@@ -790,6 +803,7 @@ The board is fully re-rendered after every move to maintain alignment and consis
 #### How Coding Elements Are Met
 
 **Random events (Element 1):**  
+
 - Backtracking solution generation combined with shuffled candidate order  
 - Randomized cell removal when creating the puzzle  
 
@@ -798,6 +812,7 @@ Each run produces a unique valid board configuration.
 ---
 
 **Data structures (Element 2):**  
+
 - `std::vector<std::vector<int>>` for the Sudoku grid  
 - `std::vector<std::vector<bool>>` mask for fixed cells  
 
@@ -807,6 +822,7 @@ This ensures separation between immutable clues and mutable player input.
 
 **Algorithmic logic:**  
 A move is valid only if:
+
 - The number is not already present in the row  
 - The number is not present in the column  
 - The number is not present in the subgrid  
@@ -817,6 +833,7 @@ Subgrid size depends on difficulty (2×3 or 3×3).
 
 **Multiple files (Element 5):**  
 The module is structured as:
+
 - `sudoku.h` (interface)
 - `sudoku.cpp` (implementation)
 
@@ -825,6 +842,7 @@ It integrates with shared UI and input systems via `menu.h`.
 ---
 
 **Difficulty levels (Element 6):**  
+
 - Easy / Normal:
   - 6×6 grid  
   - 2×3 subgrid structure  
@@ -841,9 +859,10 @@ Increasing difficulty reduces initial information and increases constraint compl
 
 ### Minesweeper Minigame ('minesweeper.cpp')
 
-A classic logic-based minigame triggered when players try to mine ores. The game dynamically generates a solvable minefield using random placement and provides real-time feedback through an ASCII board with numbered hints on adjacent mines, flagging, and flood-fill reveal mechanics. Players interact with the puzzle by typing an action (F - flag, R - reveal, Q - quit) and corresponding x y coordinates of the cell. 
+A classic logic-based minigame triggered when players try to mine ores. The game dynamically generates a solvable minefield using random placement and provides real-time feedback through an ASCII board with numbered hints on adjacent mines, flagging, and flood-fill reveal mechanics. Players interact with the puzzle by typing an action (F - flag, R - reveal, Q - quit) and corresponding x y coordinates of the cell.
 
 **How coding elements are met:**
+
 - **Random events (Element 1):** Puzzle generation uses srand() seeded with current time and random mine placement to ensure every board is unique and fair. The number and positions of mines vary each playthrough.
 
 - **Storing data (Element 2):** Board states are managed with three parallel 2D std::vector<std::vector<...>> grids (mineGrid, solutionGrid, and revealedGrid). High scores (time + player name) are stored persistently using file I/O in showHighScore() / saveHighScore(), allowing leaderboard persistence across game sessions.
@@ -851,9 +870,9 @@ A classic logic-based minigame triggered when players try to mine ores. The game
 - **Dynamic memory management (Element 3):** All board grids are allocated dynamically at runtime using std::vector with sizes determined by the chosen difficulty. Memory is automatically managed by the vector destructors when the Minesweeper object goes out of scope, preventing leaks even on early game exit.
 
 - **Multiple difficulty levels (Element 6):** Difficulty is scaled by changing grid size and mine number:
-    - **Easy:** 6x6 grid with 7 mines 
-    - **Medium:** 8x8 grid with 12 mines
-    - **Hard:** 10x10 grid with 20 mines
+  - **Easy:** 6x6 grid with 7 mines
+  - **Medium:** 8x8 grid with 12 mines
+  - **Hard:** 10x10 grid with 20 mines
   
 ---
 
@@ -862,6 +881,7 @@ A classic logic-based minigame triggered when players try to mine ores. The game
 A logic and arithmetic-based minigame used during equipment progression in TermiCraft. The player receives four cards and must use each value exactly once with +, -, *, / and parentheses to reach exactly 24.
 
 **How coding elements are met:**
+
 - **Random events (Element 1):** Puzzle selection uses rand() seeded with current time to pick a random valid 4-number puzzle from the bank each time, ensuring every session feels unique.
 
 - **Storing data (Element 2):**
@@ -873,8 +893,6 @@ A logic and arithmetic-based minigame used during equipment progression in Termi
 - **Program codes in multiple files (Element 5):** Core game logic is in twentyfour.cpp / twentyfour.h, while expression parsing and evaluation are separated into evaluator.cpp / evaluator.h for clean modularity.
 
 - **Multiple difficulty levels (Elemen 6):** Difficulty is controlled by attempts and timeLimit parameters passed to playGame():
-    - **Easy:** 5 attempts, 180 seconds
-    - **Medium:** 3 attempts, 90 seconds
-    - **Hard:** 1 attempt, 30 seconds
-
-
+  - **Easy:** 5 attempts, 180 seconds
+  - **Medium:** 3 attempts, 90 seconds
+  - **Hard:** 1 attempt, 30 seconds
