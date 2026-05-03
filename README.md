@@ -139,36 +139,35 @@ on Linux and require no additional installation:
 
 Terminal rendering uses ANSI escape codes via the team's `colors.h` 
 
-### Wordle Minigame (`wordle.cpp`)
+### Wordle Minigame (wordle.cpp)
 
-A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attempts to identify a hidden word, with feedback provided via high-contrast color-coded tiles: **Green** (correct position), **Yellow** (wrong position), and **Gray** (not in word). The game features a live "Letters Used" keyboard tracker that updates in real-time to show the best-known status of each letter in the alphabet.
+A terminal-based logic puzzle integrated into TermiCraft. The player has 5 attempts to identify a hidden word, with feedback provided via high-contrast color-coded tiles: Green (correct position), Yellow (wrong position), and Gray (not in word). The game features a live "Letters Used" keyboard tracker that updates in real-time to show the best-known status of each letter in the alphabet. This tracker is important for strategy, as it encodes global information across all previous guesses rather than just the current attempt.
 
-**How coding elements are met:**
+The system is designed to behave similarly to the official Wordle game logic, including strict validation of input length, rejection of invalid words, and per-letter feedback computation that respects duplicate letter rules. The algorithm ensures correctness by marking already-used target letters to prevent over-counting yellow tiles.
 
-- **Random events (Element 1):** The game utilizes `rand()` to select a target word from three categorized dictionaries (`WORDS_4`, `WORDS_5`, or `WORDS_6`). This ensures the hidden word is different every time the minigame is triggered.
+The UI is fully terminal-rendered using ANSI escape codes from colors.h, with a structured grid layout that maintains alignment across varying word lengths. Each row is dynamically rendered based on guess history, ensuring consistent spacing and visual clarity.
 
-- **Data structures (Element 2):** Uses `std::vector<std::string>` to store categorized word lists and `std::vector<int>` status arrays to track the state of the board and the keyboard. The algorithm handles duplicate letters by tracking character usage in a boolean vector, ensuring yellow/green hints are technically accurate (e.g., not over-counting letters).
+The word pool is split into three difficulty tiers (WORDS_4, WORDS_5, WORDS_6), each containing a curated dictionary of valid English words. These are used both for answer selection and guess validation, ensuring that gameplay remains constrained to meaningful vocabulary rather than arbitrary strings.
 
-- **Multiple files (Element 5):** The module is designed as a standalone component that integrates with the project-wide `colors.h` for ANSI rendering and `menu.h` for screen management. It uses a clean functional interface (`runWordle`) to be called from the main game state.
+How coding elements are met:
 
-- **Difficulty levels (Element 6):** Difficulty is mechanically enforced through word length. The `runWordle` function accepts a `wordLength` parameter (4, 5, or 6), which switches the game logic between "Easy," "Normal," and "Hard" modes, respectively, by referencing different pointer-based dictionaries.
+**Random events (Element 1):** The target word is selected randomly using rand() from a predefined vector of valid words based on difficulty. This ensures that every run of the minigame produces a different hidden word, with uniform probability across the word list. The randomness is deterministic only if the same seed is reused, allowing reproducibility for debugging.
 
-### Wordle Minigame (`wordle.cpp`)
+**Data structures (Element 2): ** Uses std::vector<std::string> for storing word banks and std::vector<int> / std::vector<bool> structures to track letter states and match evaluation. A per-guess evaluation array stores tile states (0 = gray, 1 = yellow, 2 = green), ensuring deterministic rendering. Additionally, a 26-length alphabet state array maintains cumulative letter knowledge across guesses for the on-screen keyboard.
 
-An integrated terminal-based logic puzzle where players must identify a hidden word within 5 attempts. The game features a dynamic UI with color-coded feedback: **Green** (correct position), **Yellow** (wrong position), and **Gray** (not in word), alongside a "Letters Used" keyboard tracker to help players narrow down possibilities.
+**Algorithmic logic: **Implements a two-pass matching algorithm identical to Wordle’s official rules:
+First pass identifies correct-position (green) matches.
+Second pass assigns partial matches (yellow) while respecting consumed letters.
+This prevents incorrect duplication of yellow tiles when letters appear multiple times.
 
-**How coding elements are met:**
+**Multiple files (Element 5):** The module is fully encapsulated and integrates with colors.h for rendering and menu.h for UI consistency. It exposes a single entry point runWordle(int wordLength) that allows seamless invocation from the main game loop without exposing internal state.
 
-- **Random events (Element 1):** The target word is selected randomly from a pool of hundreds of words using `rand()` and `<cstdlib>` functions. This ensures a fresh challenge for each encounter.
-  
-- **Data structures (Element 2):** The game uses `std::vector<std::string>` for the word dictionaries (`WORDS_4`, `WORDS_5`, `WORDS_6`) and a `std::vector<int>` status array to track the state of all 26 letters to render the live keyboard interface.
+**Difficulty levels (Element 6):** Difficulty is directly mapped to word length:
+Easy: 4-letter words (high frequency vocabulary, faster solving time)
+Normal: 5-letter words (balanced difficulty and vocabulary range)
+Hard: 6-letter words (lower frequency words, higher cognitive load)
 
-- **Multiple files (Element 5):** The module integrates seamlessly with `colors.h` for ANSI rendering and uses `<termios.h>` to toggle **ICANON** and **ECHO** modes, allowing for validated terminal input without interfering with the main game's raw input settings.
-
-- **Difficulty levels (Element 6):** The game scales difficulty by varying the word length:
-    - **Easy:** 4-letter words.
-    - **Normal:** 5-letter words.
-    - **Hard:** 6-letter words.
+This scaling affects both the solution space size and the cognitive difficulty of pattern recognition.
 
 ---
 
@@ -206,7 +205,9 @@ A classic logic-based minigame triggered when players try to mine ores. The game
     - **Easy:** 6x6 grid with 7 mines 
     - **Medium:** 8x8 grid with 12 mines
     - **Hard:** 10x10 grid with 20 mines
+  
 ---
+
 ### Twentyfour Minigame ('twentyfour.cpp', 'evaluator.cpp')
 
 A logic and arithmetic-based minigame used during equipment progression in TermiCraft. The player receives four cards and must use each value exactly once with +, -, *, / and parentheses to reach exactly 24.
