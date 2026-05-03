@@ -17,6 +17,8 @@
 
 TermiCraft is a 2D text-based survival and mining game played entirely in the terminal. Each run generates a fresh ASCII world with surface terrain, underground layers, and ore deposits. Players mine resources to craft progressively stronger tools and armor, and some crafting tiers trigger minigames (Wordle, Minesweeper, TwentyFour, Sudoku). The goal is to reach the dragon cave, defeat the final boss, and finish with the highest score.
 
+## Video demo : https://connecthkuhk-my.sharepoint.com/:v:/g/personal/u3663602_connect_hku_hk/IQCt81M8rkMkRYQBxVnZdqKSAS_sefPqCBEr9zjzRP_1WAs?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=7SvDTx 
+
 ## Requirements
 
 - C++11 compiler (tested with `g++`)
