@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <csignal>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 #include <fcntl.h>
 #include <iostream>
@@ -13,6 +14,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 
 #include "colors.h"
 #include "day_night.h"
@@ -21,6 +23,7 @@
 #include "fog_of_war.h"
 #include "menu.h"
 #include "minesweeper.h"
+#include "twentyfour.h"
 #include "player.h"
 #include "score.h"
 #include "types.h"
@@ -28,6 +31,7 @@
 
 // wordle.cpp exports this free function
 bool runWordle(int wordLength);
+bool runSudoku(Difficulty diff);
 
 // ----- GLOBALS -----
 
@@ -80,10 +84,10 @@ static bool runDragonCaveSequence(GameState& state) {
     for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
     std::cout << "\xe2\x95\x97\n";
 
-    // Title row: "~  D R A G O N ' S   L A I R  ~" = 32 display cols, centered in BW
+    // Title row: "~  D R A G O N ' S   L A I R  ~" = 31 display cols, centered in BW
     {
-        int tl = (BW - 32) / 2;
-        int tr = BW - 32 - tl;
+        int tl = (BW - 31) / 2;
+        int tr = BW - 31 - tl;
         std::cout << P << "\xe2\x95\x91\033[1;31m"
                   << std::string(tl, ' ')
                   << "~  D R A G O N ' S   L A I R  ~"
@@ -199,7 +203,12 @@ static void sigwinchHandler(int) { termResized = 1; }
 // ----- TERMINAL SETUP -----
 
 void setupTerminal() {
-    tcgetattr(STDIN_FILENO, &originalTermios);
+    static bool originalSaved = false;
+    if (!originalSaved) {
+        tcgetattr(STDIN_FILENO, &originalTermios);
+        originalSaved = true;
+    }
+
     struct termios raw = originalTermios;
     raw.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &raw);
@@ -386,8 +395,15 @@ void runGameLoop() {
             bool won = false;
             if (gameState.currentMinigame == MINIGAME_WORDLE)
                 won = runWordle(gameState.settings.wordleWordLength);
-            else
+            else if (gameState.currentMinigame == MINIGAME_MINESWEEPER)
                 won = runMinesweeper(gameState.settings.minesweeperSize);
+            else if (gameState.currentMinigame == MINIGAME_TWENTYFOUR)
+                won = runTwentyFour(gameState.settings.twentyFourAttempts,
+                                    gameState.settings.twentyFourTimeLimit);
+            else if (gameState.currentMinigame == MINIGAME_SUDOKU)
+                won = runSudoku(gameState.difficulty);
+            else 
+                won = false;
 
             if (g_minigameForfeited) {
                 // Player fled mid-challenge — double penalty, cancel any pending upgrade
@@ -542,11 +558,36 @@ void runGameLoop() {
         char input;
         if (read(STDIN_FILENO, &input, 1) != 1) continue;
 
+        // Map arrow keys → WASD
+        if (input == '\033') {
+            char seq[2] = {0, 0};
+            fd_set fds2; FD_ZERO(&fds2); FD_SET(STDIN_FILENO, &fds2);
+            struct timeval tv2 = {0, 5000};
+            if (select(STDIN_FILENO + 1, &fds2, nullptr, nullptr, &tv2) > 0 &&
+                read(STDIN_FILENO, &seq[0], 1) == 1 && seq[0] == '[') {
+                if (read(STDIN_FILENO, &seq[1], 1) == 1) {
+                    switch (seq[1]) {
+                    case 'A': input = 'w'; break;
+                    case 'B': input = 's'; break;
+                    case 'C': input = 'd'; break;
+                    case 'D': input = 'a'; break;
+                    default: continue;
+                    }
+                } else { continue; }
+            } else { continue; }
+        }
+
         switch (input) {
         case 'q':
         case 'Q':
-            if (showConfirmation("Quit to menu?"))
+            if (showConfirmation("Quit to menu?")) {
+                if (showConfirmation("Save progress?")) {
+                    restoreTerminal();
+                    saveGame(gameState);
+                    setupTerminal();
+                }
                 gameRunning = false;
+            }
             break;
         case 'p':
         case 'P':
@@ -592,21 +633,22 @@ int main() {
             if (gameState.gameOver || gameState.victory) {
                 restoreTerminal();
                 // Brief pause so death/win doesn't feel instant
-                clearScreen();
+                clearAndCenterV(7);
+                std::string splashPad = hpad(30);
                 if (gameState.victory) {
-                    std::cout << "\n\n\033[1;32m"
-                        "                    ══════════════════════════════\n"
-                        "                          DRAGON SLAIN!  🐉\n"
-                        "                    ══════════════════════════════\n"
-                        "\033[0m\n"
-                        "\033[38;5;220m                    Calculating score...\033[0m\n";
+                    std::cout << "\033[1;32m"
+                        << splashPad << "══════════════════════════════\n"
+                        << splashPad << "      DRAGON SLAIN!  \xf0\x9f\x90\x89\n"
+                        << splashPad << "══════════════════════════════\n"
+                        << "\033[0m\n"
+                        << "\033[38;5;220m" << splashPad << "Calculating score...\033[0m\n";
                 } else {
-                    std::cout << "\n\n\033[1;31m"
-                        "                    ══════════════════════════════\n"
-                        "                           YOU DIED  💀\n"
-                        "                    ══════════════════════════════\n"
-                        "\033[0m\n"
-                        "\033[38;5;240m                    " << gameState.lastMessage << "\033[0m\n";
+                    std::cout << "\033[1;31m"
+                        << splashPad << "══════════════════════════════\n"
+                        << splashPad << "       YOU DIED  \xf0\x9f\x92\x80\n"
+                        << splashPad << "══════════════════════════════\n"
+                        << "\033[0m\n"
+                        << "\033[38;5;240m" << hpad((int)gameState.lastMessage.size()) << gameState.lastMessage << "\033[0m\n";
                 }
                 std::cout.flush();
                 usleep(1800000);  // 1.8 seconds
