@@ -4,16 +4,16 @@
 
 | Name | Student ID | Role |
 | :--- | :--- | :--- |
-| Sohan | 3036636025 | Boss fight, score system |
-| Aryan | 3036484587 | Wordle Implementation, Sudoku Implementation |
-| Koki | 3036505795 | Player controller, mining system, crafting system |
-| Nan | 3036475225 | Minesweeper implementation, TwentyFour implementation |
-| Saarim | 3036520068 | Main game logic, menu, integration of minigames, display, types, save file, makefile |
-| Mohit | 3036517750 | World generation, fog of war, day and night(setting) |
+| Sohan Gupta Thedla | 3036636025 | Boss fight, score system |
+| Aryan Sokhiya | 3036484587 | Wordle Implementation, Sudoku Implementation |
+| Koki Ukai | 3036505795 | Player controller, mining system, crafting system |
+| Nan Jiang | 3036475225 | Minesweeper implementation, TwentyFour implementation |
+| Sheikh Mohammad Saarim | 3036520068 | Main game logic, menu, integration of minigames, display, types, save file, makefile |
+| Mohit Reddy Vuyyuru | 3036517750 | World generation, fog of war, day and night(setting) |
 
 ---
 
-## Explanation of Game
+## Game Overview
 
 TermiCraft is a 2D text-based survival and mining game played entirely in the terminal. Each run generates a fresh ASCII world with surface terrain, underground layers, and ore deposits. Players mine resources to craft progressively stronger tools and armor, and some crafting tiers trigger minigames (Wordle, Minesweeper, TwentyFour, Sudoku). The goal is to reach the dragon cave, defeat the final boss, and finish with the highest score.
 
@@ -24,7 +24,7 @@ TermiCraft is a 2D text-based survival and mining game played entirely in the te
 - `ncurses` development library
 - Terminal with ANSI support
 
-## How to Run
+## Build and Run
 
 1. Build the game:
 
@@ -32,13 +32,13 @@ TermiCraft is a 2D text-based survival and mining game played entirely in the te
   make
   ```
 
-1. Launch:
+2. Launch:
 
   ```bash
   ./termicraft
   ```
 
-## File Structure
+## Project Structure
 
 - `main.cpp` / `menu.cpp`: entry point, menus, and game loop coordination
 - `world_gen.cpp`, `fog_of_war.cpp`, `day_night.cpp`: world generation and visual systems
@@ -50,7 +50,7 @@ TermiCraft is a 2D text-based survival and mining game played entirely in the te
 
 ---
 
-## Features Implemented
+## Implementation Summary
 
 ### Player Controller & Mining System (`player.h`, `player.cpp`)
 
@@ -70,68 +70,17 @@ Implements the core player entity with real-time keyboard input handling (WASD m
 
 - **Difficulty levels (Element 6):** Reads difficulty settings from `GameState` to set player starting health and minigame damage (`minigameDamage`). Tool requirements for mining blocks create a soft difficulty curve (hands → wood → stone → iron → gold → diamond), while dragon cave blocks remain accessible regardless of tier, providing risk/reward choices on higher difficulties.
 
----
-
-# TermiCraft — Final Boss Fight & Score System
+## Final Boss Fight and Score System
 
 **Author:** Sohan Gupta Thedla  
 **UID:** 3036636025  
 **Files:** `final_fight.h`, `final_fight.cpp`, `score.h`, `score.cpp`
 
----
-
-This module covers two responsibilities: the final boss fight (a Space
-Invaders-style dragon encounter rendered using ncurses) and the centralised
-score system used across the entire game by all modules.
+### Final Boss Fight (`final_fight.h` / `final_fight.cpp`)
 
 ---
 
-## File Descriptions
-
-### `final_fight.h`
-
-Header file declaring all constants, structs, and public function signatures for
-the boss fight. All arena dimensions, phase thresholds, HP bonuses, damage
-values, and score constants are defined here using `#define` so any value can be
-tuned without touching implementation code. Declares four custom structs:
-`BossConfig`, `Dragon`, `Fireball`, and `Arrow`. Intentionally does not redefine
-any type already declared in `types.h` — `Difficulty`, `MaterialTier`, and
-`HighScore` are all used directly from the team's shared header.
-
-### `final_fight.cpp`
-
-Full implementation of the boss fight sequence. Handles ncurses initialisation
-and teardown, dynamic layout computation from live terminal dimensions, 14
-colour pair registrations, the 50-tick opening animation with shockwave and roar
-damage, the main game loop (input draining, dragon movement, fireball spawning,
-arrow firing, collision detection, phase transitions, Hard-mode enrage), and the
-post-fight ANSI score breakdown screen. ncurses is initialised inside
-`runBossFight()` and torn down with `endwin()` before returning, so the rest of
-the game's ANSI output is completely unaffected.
-
-### `score.h`
-
-Header file declaring the two public scoring functions: `addScore()` and
-`saveFinalScore()`. This is the single point of truth for all score increments
-across the entire codebase. Both the mining phase (`player.cpp`) and the boss
-fight (`final_fight.cpp`) call `addScore()` rather than modifying `state.score`
-directly, ensuring the difficulty multiplier is applied identically everywhere.
-
-### `score.cpp`
-
-Implements `addScore()` and `saveFinalScore()`. All file I/O for high scores is
-delegated entirely to `fileio.cpp` — `score.cpp` never opens or writes any
-files directly.
-
----
-
----
-
-# Part 1 — Final Boss Fight (`final_fight.h` / `final_fight.cpp`)
-
----
-
-## Overview
+#### Overview
 
 The player enters the dragon cave portal and is taken into a full-screen ncurses
 arena. A large ASCII dragon moves left and right across the top of the screen,
@@ -159,7 +108,7 @@ row  H-1    ╚═════════════════════�
 
 ---
 
-## How Coding Elements Are Met
+#### How Coding Elements Are Met
 
 **Random events (Element 1):** Fireball spawn positions are derived from the
 dragon's live `x` position, which changes every tick as the dragon bounces
@@ -209,7 +158,7 @@ loop.
 
 ---
 
-## Features
+#### Features
 
 ### Three-Phase Dragon
 
@@ -286,7 +235,7 @@ to minimum 1 HP). The player can press `Q` to flee during the opening.
 
 ---
 
-## Function Reference — `final_fight.cpp`
+#### Function Reference — `final_fight.cpp`
 
 ### `initFightColors()`
 
@@ -566,11 +515,11 @@ The full sequence of execution inside this function:
 
 ---
 
-# Part 2 — Score System (`score.h` / `score.cpp`)
+### Score System (`score.h` / `score.cpp`)
 
 ---
 
-## Overview
+#### Overview
 
 The score system provides the single point of truth for all score increments in
 the game. Instead of each module applying the difficulty multiplier
@@ -581,7 +530,7 @@ actual file operations to `fileio.cpp`.
 
 ---
 
-## How Coding Elements Are Met
+#### How Coding Elements Are Met
 
 **Data structures (Element 2):** Uses the shared `HighScore` struct from
 `types.h` — no duplicate struct definitions. `saveFinalScore()` populates all
@@ -606,7 +555,7 @@ by the difficulty level.
 
 ---
 
-## Features
+#### Features
 
 ### Centralised Score Calculation
 
@@ -655,7 +604,7 @@ on death so the leaderboard records it honestly.
 
 ---
 
-## Function Reference — `score.cpp`
+#### Function Reference — `score.cpp`
 
 ### `addScore(state, rawPoints)`
 
@@ -700,9 +649,9 @@ End-of-run save flow:
 
 ---
 
-## Non-Standard Libraries
+### Non-Standard Libraries
 
-### `ncurses` (`<ncurses.h>`)
+#### `ncurses` (`<ncurses.h>`)
 
 ncurses is the only non-standard library used across these modules. It is
 pre-installed on Ubuntu Linux and on the HKU CS academy server
@@ -753,7 +702,7 @@ Provides a full-screen terminal UI for the crafting bench with 10 tiered recipes
 
 ---
 
-## Non-Standard Libraries
+### Non-Standard Libraries
 
 None. All libraries used by `final_fight.cpp` and `score.cpp` are standard
 on Linux and require no additional installation:
