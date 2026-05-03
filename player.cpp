@@ -85,32 +85,6 @@ void initPlayer(GameState& state, const std::string& playerName) {
     state.lastMessage = "Welcome, " + playerName + "! Mine resources to survive.";
 }
 
-// Randomize and assign minigames to ore tiers.
-//
-// Inputs:
-// - state (GameState&): GameState with minigame slot arrays and RNG.
-//
-// Effects:
-// - Shuffles the minigame list and assigns one to each ore tier slot.
-// - Marks all slots as untriggered and sets the initialization flag.
-void initializeOreMinigames(GameState& state) {
-    if (state.minigameSlotsInitialized) return;
-
-    // Array of 4 minigame types
-    MinigameType games[] = {MINIGAME_WORDLE, MINIGAME_MINESWEEPER, MINIGAME_SUDOKU, MINIGAME_PLACEHOLDER_4TH};
-
-    // Shuffle using rng
-    std::shuffle(games, games + 4, rng);
-
-    // Assign to ores: Stone[0], Iron[1], Gold[2], Diamond[3]
-    for (int i = 0; i < 4; i++) {
-        state.oreMinigameSlots[i] = games[i];
-        state.oreMinigameTriggered[i] = false;
-    }
-
-    state.minigameSlotsInitialized = true;
-}
-
 // Check if a block type is solid and should block movement.
 //
 // Inputs:
@@ -601,41 +575,9 @@ void consumeResourcesForTier(GameState& state, MaterialTier tier) {
     }
 }
 
-// Check and trigger the crafting minigame for higher tiers.
-//
-// Inputs:
-// - state (GameState&): GameState containing equipment and pending upgrade state.
-//
-// Returns:
-// - true if a new minigame is started; false otherwise.
-//
-// Effects:
-// - Sets pendingUpgrade, starts minigame phase, and posts a rite-of-passage message.
-bool checkCraftingProgression(GameState& state) {
-    MaterialTier newPick = state.player.equipment.pickaxe;
-
-    // Only trigger for Iron (3) and above
-    if (newPick > MATERIAL_STONE) {
-        // Check if we haven't already triggered for this tier
-        if (newPick != state.pendingUpgrade) {
-            state.pendingUpgrade = newPick;
-
-            selectRandomMinigame(state);
-
-            // Signal the main loop to run the minigame
-            state.phase = PHASE_MINIGAME;
-            state.minigameActive = true;
-            state.miningPending = true;  // reuse flag — main loop checks this
-            // Store player pos as the "pending" position so trySpawnEnemy has valid coords
-            state.pendingMinePos = state.player.pos;
-            state.pendingMineType = BLOCK_AIR;  // not a real mine, just a crafting trial
-
-            std::string tierName = getMaterialName(newPick);
-            state.lastMessage = "Rite of Passage: Prove yourself to wield " + tierName + "!";
-            return true;
-        }
-    }
-
+// Check if crafting should trigger minigame (Iron, Gold, Diamond)
+bool checkCraftingProgression(GameState& /*state*/) {
+    // Minigames only trigger during mining, not crafting
     return false;
 }
 
