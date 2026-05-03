@@ -1,13 +1,13 @@
-/* TEAMNOTE START::
- * colors.h
- * SHEIKH SAARIM
- * ANSI escape codes for terminal colors and cursor control.
- * Include this if you want to make text colorful or move the cursor around.
- * 
- * Usage: cout << COLOR_RED << "Error!" << COLOR_RESET << endl;
- *
- *TEAMNOTE END
- */
+// =============================================================================
+// colors.h
+// TermiCraft — ANSI Colors & Terminal Utilities
+//
+// ANSI color codes, cursor control, and a few helper functions for
+// centering text and reading terminal size.
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: types.h, <sys/ioctl.h>
+// =============================================================================
 
 #ifndef COLORS_H
 #define COLORS_H
