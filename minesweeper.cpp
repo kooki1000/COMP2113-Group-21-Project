@@ -265,7 +265,7 @@ void Minesweeper::gameOverMessage() {
 )" << "\033[0m\n";
         double t = getElapsedTime();
         std::cout << "  Cleared in " << (int)t << " seconds!\n\n";
-        saveHighScore(t);
+        writeHighScore(t);
         showHighScore();
     } else {
         std::cout << "\033[1;31m" << R"(
