@@ -15,7 +15,7 @@
 
 // Cycle timing (ticks). At 20 ticks/sec, 2400 = 2 min full cycle.
 // Adjust CYCLE_LENGTH to change how long a day lasts.
-const int CYCLE_LENGTH = 2400;
+const int CYCLE_LENGTH = 6000;
 const int DAY_START    = 0;
 const int DUSK_START   = (int)(CYCLE_LENGTH * 0.40);
 const int NIGHT_START  = (int)(CYCLE_LENGTH * 0.50);
