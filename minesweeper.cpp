@@ -27,86 +27,133 @@
 // Author:       Nan
 // Dependencies: menu.h, colors.h, minesweeper.h, types.h
 // =============================================================================
-#include <iostream>
-#include <cctype>
-#include <vector>
-#include <cstdlib>
-#include <ctime>
-#include <fstream>
-#include <chrono>
 #include "minesweeper.h"
 #include "menu.h"
 #include "colors.h"
 
-//creates high score file and writes to it
-void writeHighScore(double time) {
-    std::string filename = "minesweeper_highscore.txt";
-    double bestTime = 999999.0;   
-    std::ifstream fin(filename);
-    if (fin) {
-        fin >> bestTime;
-        fin.close();
-    }
-    if (time < bestTime) {
-        std::ofstream fout(filename);
-        if (fout) {
-            fout << time;
-            fout.close();
-            std::cout << "\033[1;32m  *** New best time: " << (int)time << "s! ***\033[0m\n";
-        }
-    }
+#include <iostream>
+#include <cctype>
+#include <cstdlib>
+#include <ctime>
+#include <cstring>
+#include <fstream>
+#include <chrono>
+#include <limits>
+
+// Constructor 
+
+Minesweeper::Minesweeper(int size, int mines) : size(size), mines(mines) {
+    initializeGrids(size);
+    placeMines();
+    fillSolutionGrid();
+    gameOver = false;
+    win      = false;
+    startTime = std::chrono::steady_clock::now();
 }
 
-//Displayes the current high score
-void Minesweeper::showHighScore() {
-    const std::string filename = "minesweeper_highscore.txt";
-    std::ifstream fin(filename);
-    if (fin) {
-        double best;
-        fin >> best;
-        fin.close();
-        std::cout << "  Best time: " << (int)best << "s\n";
-    } else {
-        std::cout << "  Best time: --\n";
-    }
-}
-
-//Clears the screen after an action is made and the grid needs to be updated
+//Private helpers 
 void Minesweeper::clearScreen() {
     std::cout << "\033[2J\033[H";
     std::cout.flush();
 }
 
-//Converts user input to uppercase so user input is not case-sensitive
-char Minesweeper::toUpper(char c){
+char Minesweeper::toUpper(char c) {
     return (char)toupper((unsigned char)c);
 }
 
-//Checks if the user input lies within the set grid
 bool Minesweeper::isValidMove(int x, int y) {
-    if (x < 0 || x >= size || y < 0 || y >= size) {
-        return false;
-    }
-    return true;
+    return x >= 0 && x < size && y >= 0 && y < size;
 }
 
-//Counts the number of mines a non-mine cell is adjacent to
 int Minesweeper::countAdjacentMines(int x, int y) {
     int count = 0;
     for (int i = -1; i <= 1; ++i) {
         for (int j = -1; j <= 1; ++j) {
             if (i == 0 && j == 0) continue;
-            if (isValidMove(x + i, y + j)) {
-                if (mineGrid[x + i][y + j]) {
-                    count++;
-                }
-            }
+            if (isValidMove(x + i, y + j) && mineGrid[x + i][y + j])
+                count++;
         }
     }
     return count;
 }
 
-//Displays the board shown to the player
+void Minesweeper::initializeGrids(int sz) {
+    this->size = sz;
+    mineGrid.assign(sz, std::vector<bool>(sz, false));
+    solutionGrid.assign(sz, std::vector<int>(sz, 0));
+    revealedGrid.assign(sz, std::vector<char>(sz, '#'));
+}
+
+void Minesweeper::placeMines() {
+    int count = 0;
+    while (count < mines) {
+        int x = rand() % size;
+        int y = rand() % size;
+        if (!mineGrid[x][y]) {
+            mineGrid[x][y] = true;
+            count++;
+        }
+    }
+}
+
+void Minesweeper::fillSolutionGrid() {
+    for (int x = 0; x < size; x++)
+        for (int y = 0; y < size; y++)
+            solutionGrid[x][y] = mineGrid[x][y] ? -1 : countAdjacentMines(x, y);
+}
+
+void Minesweeper::revealSingleCell(int x, int y) {
+    if (!isValidMove(x, y) || revealedGrid[x][y] != '#') return;
+    if (mineGrid[x][y]) { gameOver = true; return; }
+    if (solutionGrid[x][y] == 0)
+        floodReveal(x, y);
+    else
+        revealedGrid[x][y] = '0' + solutionGrid[x][y];
+}
+
+void Minesweeper::floodReveal(int x, int y) {
+    if (!isValidMove(x, y) || revealedGrid[x][y] != '#') return;
+    revealedGrid[x][y] = (solutionGrid[x][y] == 0) ? ' ' : ('0' + solutionGrid[x][y]);
+    if (solutionGrid[x][y] != 0) return;
+    for (int i = -1; i <= 1; ++i)
+        for (int j = -1; j <= 1; ++j) {
+            if (i == 0 && j == 0) continue;
+            floodReveal(x + i, y + j);
+        }
+}
+
+void Minesweeper::flagCell(int x, int y) {
+    if (!isValidMove(x, y)) return;
+    if (revealedGrid[x][y] == '#')
+        revealedGrid[x][y] = 'F';
+    else if (revealedGrid[x][y] == 'F')
+        revealedGrid[x][y] = '#';
+    // Ignore flag attempts on already-revealed cells
+}
+
+bool Minesweeper::checkWin() {
+    for (int x = 0; x < size; x++)
+        for (int y = 0; y < size; y++)
+            if (!mineGrid[x][y] && revealedGrid[x][y] == '#')
+                return false;
+    return true;
+}
+
+void Minesweeper::revealMines() {
+    for (int x = 0; x < size; x++)
+        for (int y = 0; y < size; y++)
+            if (mineGrid[x][y] && revealedGrid[x][y] != 'F')
+                revealedGrid[x][y] = 'M';
+}
+
+double Minesweeper::getElapsedTime() {
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = now - startTime;
+    return elapsed.count();
+}
+
+// Display 
+
 void Minesweeper::displayBoard() {
     std::string boardP = hpad(3 + size * 2);
 
@@ -139,152 +186,92 @@ void Minesweeper::displayBoard() {
         }
         std::cout << "\n";
     }
+
+    // Timer
     std::cout << "\n" << boardP << "  Time: " << (int)getElapsedTime() << "s";
     std::cout << "   Mines: " << mines << "\n\n";
 }
 
-//Fills the grid with default values at the start
-void Minesweeper::initializeGrids(int size){
-    this->size = size;
-    mineGrid.assign(size, std::vector<bool>(size, false));  
-    solutionGrid.assign(size, std::vector<int>(size, 0)); 
-    revealedGrid.assign(size, std::vector<char>(size, '#')); 
-}
+// High score saving
 
-//Randomizes mine placement 
-void Minesweeper::placeMines(){
-    int count = 0;
-    while (count < mines) {
-        int x = rand() % size;
-        int y = rand() % size;
-        if (!mineGrid[x][y]) {
-            mineGrid[x][y] = true;
-            count++;
-        }
+void Minesweeper::saveHighScore(double time) {
+    const std::string filename = "minesweeper_best.txt";
+    double best = 999999.0;
+    std::ifstream fin(filename);
+    if (fin) { fin >> best; fin.close(); }
+
+    if (time < best) {
+        std::ofstream fout(filename);
+        if (fout) { fout << time; fout.close(); }
+        std::cout << "\033[1;32m  *** New best time: " << (int)time << "s! ***\033[0m\n";
     }
 }
 
-//Fills the solution grid with integers corresponding to adjacent mine numbers
-void Minesweeper::fillSolutionGrid(){
-    for(int x=0; x<size; x++){
-        for(int y=0; y<size; y++){
-            if(mineGrid[x][y]){
-                solutionGrid[x][y] = -1;
-            } else {
-                solutionGrid[x][y] = countAdjacentMines(x, y);
-            }
-        }
-    }
-}
-
-//Cell revealing logic
-void Minesweeper::revealSingleCell(int x, int y){
-    if (!isValidMove(x, y) || revealedGrid[x][y] != '#') {
-        return;
-    }
-    if(mineGrid[x][y]){
-        gameOver = true;
-        return;
-    }
-    if (solutionGrid[x][y] == 0) {
-        floodReveal(x, y);
+void Minesweeper::showHighScore() {
+    const std::string filename = "minesweeper_best.txt";
+    std::ifstream fin(filename);
+    if (fin) {
+        double best;
+        fin >> best;
+        fin.close();
+        std::cout << "  Best time: " << (int)best << "s\n";
     } else {
-        revealedGrid[x][y] = '0' + solutionGrid[x][y];
+        std::cout << "  Best time: --\n";
     }
 }
 
-//Recursive flood revealing 
-void Minesweeper::floodReveal(int x, int y){
-    if (!isValidMove(x, y) || revealedGrid[x][y] != '#') {
-        return;
-    }
-
-    if (solutionGrid[x][y] == 0) {
-        revealedGrid[x][y] = ' ';
-    } else {
-        revealedGrid[x][y] = '0' + solutionGrid[x][y];
-    }
-
-    if (solutionGrid[x][y] != 0) {
-        return;
-    }
-
-    for (int i = -1; i <= 1; ++i) {
-        for (int j = -1; j <= 1; ++j) {
-            if (i == 0 && j == 0) continue;
-            floodReveal(x + i, y + j);
-        }
-    }
-}
-
-//Flagging logic 
-void Minesweeper::flagCell(int x, int y) {
-    if (!isValidMove(x, y)) {
-        return;
-    }
-    if(revealedGrid[x][y] == 'F'){
-        revealedGrid[x][y] = '#';
-    }
-    else if(revealedGrid[x][y] == '#'){
-        revealedGrid[x][y] = 'F';
-    }
-}
-
-//Checks winning condition by checking of the non-mine cells are revealed
-bool Minesweeper::checkWin(){
-    for(int x=0; x<size; x++){
-        for(int y=0; y<size; y++){
-            if (!mineGrid[x][y] && revealedGrid[x][y] == '#') {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-//Reveals the mines after game is over
-void Minesweeper::revealMines(){
-    for(int x=0; x<size; x++){
-        for(int y=0; y<size; y++){
-            if(mineGrid[x][y] && revealedGrid[x][y] != 'F'){
-                revealedGrid[x][y] = 'M';
-            }
-        }
-    }
-}
+//Game over message
 
 void Minesweeper::gameOverMessage() {
+    ::clearAndCenterV(win ? 12 : 10);
+    std::string Aw = hpad(63);   
+    std::string Ag = hpad(80);   
+
     if (win) {
-        std::cout << "\033[1;32m" << R"(
-   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗██╗
-   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║██║
-    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║██║
-     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║██║
-      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██║
-      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝
-)" << "\033[0m\n";
+        std::cout << "\033[1;32m\n"
+            << Aw << "   ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗██╗\n"
+            << Aw << "   ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║██║\n"
+            << Aw << "    ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║██║\n"
+            << Aw << "     ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║██║\n"
+            << Aw << "      ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║██║\n"
+            << Aw << "      ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝\n"
+            "\033[0m\n";
         double t = getElapsedTime();
-        std::cout << "  Cleared in " << (int)t << " seconds!\n\n";
-        writeHighScore(t);
-        showHighScore();
+        std::cout << Aw << "  Cleared in " << (int)t << " seconds!\n\n";
+        saveHighScore(t);
+        {
+            // Center "Best time: Xs"
+            const std::string filename = "minesweeper_best.txt";
+            std::ifstream fin(filename);
+            if (fin) {
+                double best; fin >> best; fin.close();
+                std::cout << Aw << "  Best time: " << (int)best << "s\n";
+            } else {
+                std::cout << Aw << "  Best time: --\n";
+            }
+        }
     } else {
-        std::cout << "\033[1;31m" << R"(
-   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗
-  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗
-  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝
-  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
-  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║
-   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝
-)" << "\033[0m\n";
+        std::cout << "\033[1;31m\n"
+            << Ag << "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗\n"
+            << Ag << "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗\n"
+            << Ag << "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝\n"
+            << Ag << "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗\n"
+            << Ag << "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║\n"
+            << Ag << "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝\n"
+            "\033[0m\n";
     }
 
-    std::cout << "\n  Press any key to continue...";
+    {
+        const char* prompt = "Press any key to continue...";
+        std::cout << "\n" << hpad((int)strlen(prompt)) << prompt;
+    }
     std::cout.flush();
     char dummy;
     read(STDIN_FILENO, &dummy, 1);
 }
 
-//Handles user input + validates input follows correct format (action, x, y)
+//Input
+
 void Minesweeper::getPlayerInput() {
     while (true) {
         int x, y;
@@ -325,8 +312,7 @@ void Minesweeper::getPlayerInput() {
     }
 }
 
-//Applies user action to grid
-void Minesweeper::makeMove(char action, int x, int y){
+void Minesweeper::makeMove(char action, int x, int y) {
     if (!isValidMove(x, y)) return;
 
     if (action == 'R') {
@@ -341,7 +327,8 @@ void Minesweeper::makeMove(char action, int x, int y){
     }
 }
 
-//Full game logic 
+//Main game loop 
+
 void Minesweeper::playGame() {
     while (!gameOver) {
         int boxW = std::max(3 + size * 2 + 4, 36);
@@ -366,7 +353,7 @@ void Minesweeper::playGame() {
 
         std::cout << "\033[1;33m";
         msTopBar();
-        msLine("💥 MINESWEEPER 💥", 15);
+        msLine("💣 MINESWEEPER 💣", 17);
         msLine("R row col = reveal", 18);
         msLine("F row col = flag/unflag", 23);
         msBotBar();
@@ -388,37 +375,25 @@ void Minesweeper::playGame() {
     gameOverMessage();
 }
 
-//Checks time taken to complete puzzle
-double Minesweeper::getElapsedTime() {
-    auto now = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed = now - startTime;
-    return elapsed.count();
-}
 
-//Initializing + running the game
 bool runMinesweeper(int gridSize) {
     int mineCount = (gridSize * gridSize) / 5;
     if (mineCount < 3) mineCount = 3;
+
+    // Restore echo/canonical so std::cin works
     struct termios cooked;
     tcgetattr(STDIN_FILENO, &cooked);
     cooked.c_lflag |= (ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &cooked);
+
     srand((unsigned int)time(0));
     Minesweeper game(gridSize, mineCount);
     game.playGame();
+
+    // Return to raw mode (caller — main.cpp — will call setupTerminal() after us,
+    // but we restore raw here in case the minigame exits mid-session)
     cooked.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &cooked);
+
     return game.didWin();
 }
-
-//Constructor 
-Minesweeper::Minesweeper(int size, int mines) : size(size), mines(mines) {
-    initializeGrids(size);
-    placeMines();
-    fillSolutionGrid();
-    gameOver = false;
-    win      = false;
-    startTime = std::chrono::steady_clock::now();
-}
-
-
