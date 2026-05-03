@@ -2,6 +2,7 @@
  * wordle.cpp
  *
  * Wordle minigame for TermiCraft.
+ *
  * The player has 5 guesses to identify a hidden word.
  * Letters are colored green (correct position), yellow (wrong position),
  * or gray (not in word). Difficulty sets word length: 4, 5, or 6 letters.
@@ -13,8 +14,8 @@
 #include "menu.h"
 #include "types.h"
 #include <cctype>
-#include <limits>
 #include <iostream>
+#include <unistd.h>
 #include <string>
 #include <termios.h>
 #include <unistd.h>
@@ -22,33 +23,36 @@
 #include <cstdlib>
 
 static void showWordleEndScreen(bool won, const std::string& target) {
+    clearAndCenterV(won ? 12 : 11);
+
+    std::string Aw = hpad(63);
+    std::string Ag = hpad(80);
+
     if (won) {
-        std::cout << R"(
-   ██╗    ██╗ ██████╗ ███╗   ██╗
-   ██║    ██║██╔═══██╗████╗  ██║
-   ██║ █╗ ██║██║   ██║██╔██╗ ██║
-   ██║███╗██║██║   ██║██║╚██╗██║
-   ╚███╔███╔╝╚██████╔╝██║ ╚████║
-    ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═══╝
-        )" << std::endl;
+        std::cout << COLOR_BOLD_GREEN << "\n"
+            << Aw << "      ██╗   ██╗ ██████╗ ██╗   ██╗    ██╗    ██╗██╗███╗   ██╗\n"
+            << Aw << "      ╚██╗ ██╔╝██╔═══██╗██║   ██║    ██║    ██║██║████╗  ██║\n"
+            << Aw << "       ╚████╔╝ ██║   ██║██║   ██║    ██║ █╗ ██║██║██╔██╗ ██║\n"
+            << Aw << "        ╚██╔╝  ██║   ██║██║   ██║    ██║███╗██║██║██║╚██╗██║\n"
+            << Aw << "         ██║   ╚██████╔╝╚██████╔╝    ╚███╔███╔╝██║██║ ╚████║\n"
+            << Aw << "         ╚═╝    ╚═════╝  ╚═════╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝\n"
+            << COLOR_RESET << "\n";
 
-        std::cout << COLOR_GREEN << "    Correct! You guessed the word.\n" << COLOR_RESET;
+        std::cout << "\n" << hpad(31) << "Correct! You guessed the word.\n";
     } else {
-    std::cout << R"(
-   ██████╗  █████╗ ███╗   ███╗███████╗
-  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝
-  ██║  ███╗███████║██╔████╔██║█████╗  
-  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  
-  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
-   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
-    )" << std::endl;
+        std::string wordStr = "The word was: ";
+        for (char c : target) wordStr += (char)toupper(c);
 
-    std::cout << COLOR_RED << "    The word was: " << COLOR_BOLD_WHITE;
+        std::cout << COLOR_BOLD_RED << "\n"
+            << Ag << "   ██████╗  █████╗ ███╗   ███╗███████╗     ██████╗ ██╗   ██╗███████╗██████╗\n"
+            << Ag << "  ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██╔═══██╗██║   ██║██╔════╝██╔══██╗\n"
+            << Ag << "  ██║  ███╗███████║██╔████╔██║█████╗      ██║   ██║██║   ██║█████╗  ██████╔╝\n"
+            << Ag << "  ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗\n"
+            << Ag << "  ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║\n"
+            << Ag << "   ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝\n"
+            << COLOR_RESET << "\n";
 
-    for (char c : target)
-        std::cout << (char)toupper(c);
-
-    std::cout << COLOR_RESET << "\n";
+        std::cout << "\n" << hpad((int)wordStr.size()) << wordStr << "\n";
     }
 }
 
@@ -56,8 +60,8 @@ static void showWordleEndScreen(bool won, const std::string& target) {
 // ─── WORD LISTS ───────────────────────────────────────────────────────────────
 
 static const std::vector<std::string> WORDS_4 = {
-
-"able","acid",
+    
+    "able","acid",
 "aged","also",
 "area","army",
 "away","back",
@@ -326,8 +330,13 @@ static const std::vector<std::string> WORDS_4 = {
 "your","zero",
 "zone"
 
+
+
 };
+
 static const std::vector<std::string> WORDS_5 = {
+
+
 
 "adore","adorn",
 "afire","aisle",
@@ -487,9 +496,13 @@ static const std::vector<std::string> WORDS_5 = {
 "young","youth",
 "zebra"
 
+
+
 };
 
 static const std::vector<std::string> WORDS_6 = {
+
+
 
 "abroad","absorb",
 "accent","accept",
@@ -680,9 +693,8 @@ static const std::vector<std::string> WORDS_6 = {
 "writer","yellow",
 "zephyr"
 
+
 };
-
-
 
 static const int MAX_GUESSES = 5;
 
@@ -694,15 +706,31 @@ static std::string toLowerString(std::string s) {
 }
 
 static void printWordleTitle(int wordLength) {
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "\n    ╔══════════════════════════════════╗\n";
-    std::cout <<   "    ║     🟩 WORDLE MINIGAME 🟩        ║\n";
-    std::cout <<   "    ║  Guess the " << wordLength << "-letter word!      ║\n";
-    std::cout <<   "    ║  You have " << MAX_GUESSES << " attempts.          ║\n";
-    std::cout <<   "    ╚══════════════════════════════════╝\n";
+    const int BW = 40;
+    std::string P = hpad(BW + 2);
+
+    auto centerLine = [&](const std::string& text, int displayWidth = -1) {
+    int width = (displayWidth >= 0) ? displayWidth : (int)text.size();
+    int pad = BW - width;
+
+    int left = pad / 2;
+    int right = pad - left;
+        std::cout << P << "\xe2\x95\x91" << std::string(left, ' ') << text
+                  << std::string(right, ' ') << "\xe2\x95\x91\n";
+    };
+
+    std::cout << COLOR_BOLD_CYAN << "\n";
+    std::cout << P << "\xe2\x95\x94";
+    for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
+    std::cout << "\xe2\x95\x97\n";
+    centerLine("⭐ WORDLE MINIGAME ⭐", 21);
+    centerLine("Guess the " + std::to_string(wordLength) + "-letter word!");
+    centerLine("You have " + std::to_string(MAX_GUESSES) + " attempts.");
+    std::cout << P << "\xe2\x95\x9a";
+    for (int i = 0; i < BW; i++) std::cout << "\xe2\x95\x90";
+    std::cout << "\xe2\x95\x9d\n";
     std::cout << COLOR_RESET << "\n";
 }
-
 
 /*
  * printGuessRow
@@ -710,7 +738,6 @@ static void printWordleTitle(int wordLength) {
  * Input:  guess, target
  * Output: none
  */
-
 static void printGuessRow(const std::string& guess, const std::string& target) {
     int len = target.size();
     std::vector<bool> used(len, false);
@@ -733,23 +760,25 @@ static void printGuessRow(const std::string& guess, const std::string& target) {
         }
     }
 
-    std::cout << "    ";
+    // Each tile is 6 chars wide (  X  + space); center the row
+    std::string P = hpad(len * 6);
+    std::cout << P;
     for (int i = 0; i < len; i++) {
         if      (result[i] == 2) std::cout << BG_GREEN  << COLOR_BOLD_WHITE;
         else if (result[i] == 1) std::cout << BG_YELLOW << COLOR_BOLD_BLACK;
         else                     std::cout << "\033[48;5;240m" << COLOR_BOLD_WHITE;
-        std::cout << " " << (char)toupper(guess[i]) << " " << COLOR_RESET << " ";
+        std::cout << "  " << (char)toupper(guess[i]) << "  " << COLOR_RESET << " ";
     }
     std::cout << "\n";
 }
 
 static void printEmptyRow(int wordLength) {
-    std::cout << "    ";
+    std::string P = hpad(wordLength * 6);
+    std::cout << P;
     for (int i = 0; i < wordLength; i++)
-        std::cout << "\033[48;5;235m" << "   " << COLOR_RESET << " ";
+        std::cout << "\033[48;5;235m" << "     " << COLOR_RESET << " ";
     std::cout << "\n";
 }
-
 
 /*
  * printUsedLetters
@@ -757,7 +786,6 @@ static void printEmptyRow(int wordLength) {
  * Input:  guesses, target, wordLength
  * Output: none
  */
-
 static void printUsedLetters(const std::vector<std::string>& guesses,
                               const std::string& target, int wordLength) {
     std::vector<int> status(26, 0); // 0=unused, 1=gray, 2=yellow, 3=green
@@ -781,25 +809,23 @@ static void printUsedLetters(const std::vector<std::string>& guesses,
                     break;
                 }
             }
-            
             if (found  && status[guess[i] - 'a'] < 2) status[guess[i] - 'a'] = 2;
             if (!found && status[guess[i] - 'a'] == 0) status[guess[i] - 'a'] = 1;
         }
     }
 
-    std::cout << "\n    Letters used:\n    ";
+    std::string P = hpad(53);  // 26 letters × 2 chars + spacing ≈ 53
+    std::cout << "\n" << P << "Letters used:\n" << P;
     for (int i = 0; i < 26; i++) {
         char c = 'A' + i;
         if      (status[i] == 3) std::cout << BG_GREEN        << COLOR_BOLD_WHITE << c << COLOR_RESET << " ";
         else if (status[i] == 2) std::cout << BG_YELLOW       << COLOR_BOLD_BLACK << c << COLOR_RESET << " ";
         else if (status[i] == 1) std::cout << "\033[48;5;240m" << COLOR_BOLD_WHITE << c << COLOR_RESET << " ";
         else                     std::cout << COLOR_DIM        << c << COLOR_RESET << " ";
-        if (i == 12) std::cout << "\n    ";
+        if (i == 12) std::cout << "\n" << P;
     }
-    
     std::cout << "\n";
 }
-
 
 /*
  * getWordleGuess
@@ -809,8 +835,9 @@ static void printUsedLetters(const std::vector<std::string>& guesses,
  */
 static std::string getWordleGuess(int wordLength) {
     std::string input;
+    std::string P = hpad(50);
     while (true) {
-        std::cout << COLOR_WHITE << "\n    Enter guess: " << COLOR_RESET;
+        std::cout << COLOR_WHITE << "\n" << P << "Enter guess (or 'quit' to flee [-2x penalty]): " << COLOR_RESET;
 
         struct termios cooked;
         tcgetattr(STDIN_FILENO, &cooked);
@@ -825,25 +852,29 @@ static std::string getWordleGuess(int wordLength) {
 
         input = toLowerString(input);
 
+        if (input == "quit" || input == "q") {
+            g_minigameForfeited = true;
+            return "__QUIT__";
+        }
         if ((int)input.size() != wordLength) {
-            std::cout << COLOR_RED << "    Must be exactly " << wordLength << " letters.\n" << COLOR_RESET;
+            std::cout << COLOR_RED << P << "Must be exactly " << wordLength << " letters.\n" << COLOR_RESET;
             continue;
         }
         bool allAlpha = true;
         for (char c : input) if (!isalpha(c)) { allAlpha = false; break; }
         if (!allAlpha) {
-            std::cout << COLOR_RED << "    Letters only.\n" << COLOR_RESET;
+            std::cout << COLOR_RED << P << "Letters only.\n" << COLOR_RESET;
             continue;
         }
         return input;
     }
-    
 }
+
 
 static void renderWordleBoard(const std::vector<std::string>& guesses,
                                const std::string& target, int wordLength) {
-    
-    clearScreen();
+    // title(6) + rows(5×2=10) + letters(3) + prompt(2) = ~21 lines
+    clearAndCenterV(21);
     printWordleTitle(wordLength);
     for (int i = 0; i < MAX_GUESSES; i++) {
         if (i < (int)guesses.size()) printGuessRow(guesses[i], target);
@@ -852,7 +883,6 @@ static void renderWordleBoard(const std::vector<std::string>& guesses,
     }
     printUsedLetters(guesses, target, wordLength);
 }
-
 
 // ─── ENTRY POINT ─────────────────────────────────────────────────────────────
 
@@ -873,28 +903,27 @@ bool runWordle(int wordLength) {
 
     while ((int)guesses.size() < MAX_GUESSES && !won) {
         renderWordleBoard(guesses, target, wordLength);
-        std::cout << COLOR_DIM << "    Guess " << (guesses.size() + 1)
+        std::string P = hpad(38);
+        std::cout << COLOR_DIM << P << "Guess " << (guesses.size() + 1)
                   << " of " << MAX_GUESSES << COLOR_RESET;
 
         std::string guess = getWordleGuess(wordLength);
+        if (g_minigameForfeited) break;
         guesses.push_back(guess);
         if (guess == target) won = true;
     }
 
-    
     renderWordleBoard(guesses, target, wordLength);
-
 
     
 clearScreen();
 std::cout << "\n";
 showWordleEndScreen(won, target);
-
     
-    std::cout << "\n" << COLOR_DIM << "    Press any key to continue..." << COLOR_RESET;
-    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    std::cin.get();
-
+    std::cout << "\n" << COLOR_DIM << hpad(30) << "Press any key to continue..." << COLOR_RESET;
+    std::cout.flush();
+    char dummy;
+    read(STDIN_FILENO, &dummy, 1);
 
     return won;
 }

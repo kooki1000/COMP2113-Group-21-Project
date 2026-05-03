@@ -28,25 +28,14 @@
 // Standard headers only (<stack>, <queue>, <map>, <sstream>, <cctype>, <cmath>)
 // =============================================================================
 
-#include <stack>
-#include <queue>
-#include <map>
-#include <sstream>
+#include "equationevaluator.h"
+
+#include <algorithm>
 #include <cctype>
 #include <cmath>
-
-class evaluator{
-    public:
-    double evaluate(const std::string& expression);
-    bool checkNumbersUsed(const std::string expression, std::vector<int> numbers);
-    private:
-    std::map<char, int> precedence = {
-        {'+', 1}, {'-', 1}, {'*', 2}, {'/', 2}
-    };
-    bool isOperator(char c);
-    std::vector<std::string> shunting_yard(const std::string& expression);
-    double evaluate_rpn(const std::vector<std::string>& rpn);
-};
+#include <sstream>
+#include <stack>
+#include <stdexcept>
 
 bool evaluator::isOperator(char c) {
     return precedence.find(c) != precedence.end();
@@ -59,48 +48,51 @@ std::vector<std::string> evaluator::shunting_yard(const std::string& expression)
     std::string multidigit;
     for(int i = 0; i<expression.length(); i++){
         char c = expression[i];
-        if(std::isdigit(c)){
+        if (std::isspace(static_cast<unsigned char>(c))) {
+            continue;
+        }
+        if(std::isdigit(static_cast<unsigned char>(c))){
             multidigit += c;
+            continue;
+        }
+        if (!multidigit.empty()) {
+            output.push_back(multidigit);
+            multidigit.clear();
         }
         //handles expressions with paranthesis 
         else if(c=='('){
-            if(!multidigit.empty()){
-                output.push_back(multidigit);
-                multidigit = "";
-            }
             operators.push(c);
         }
         else if(c==')'){
-            if (!multidigit.empty()) {
-                output.push_back(multidigit);
-                multidigit = "";
-            }
             while(!operators.empty() && operators.top() != '('){
                 output.push_back(std::string(1, operators.top()));
                 operators.pop();
             }
-            if(!operators.empty() && operators.top() == '('){
-                operators.pop();
+            if (operators.empty()) {
+                throw std::runtime_error("Mismatched parentheses");
             }
+            operators.pop();
         }
         else if (isOperator(c)){
-            if (!multidigit.empty()) {
-                output.push_back(multidigit);
-                multidigit = "";
-            }
             while (!operators.empty() && operators.top() != '(' && precedence[operators.top()] >= precedence[c]) {
                 output.push_back(std::string(1, operators.top()));
                 operators.pop();
             }
             operators.push(c);
         }
+        else {
+            throw std::runtime_error("Invalid character");
+        }
     }
     if (!multidigit.empty()) {
         output.push_back(multidigit);
     }
     while (!operators.empty()) {
-            output.push_back(std::string(1, operators.top()));
-            operators.pop();
+        if (operators.top() == '(') {
+            throw std::runtime_error("Mismatched parentheses");
+        }
+        output.push_back(std::string(1, operators.top()));
+        operators.pop();
     }
 
     return output;
@@ -115,9 +107,6 @@ bool evaluator::checkNumbersUsed(const std::string expression, std::vector<int> 
             usedNumbers.push_back(std::stoi(token));
         }
     }
-    if (usedNumbers.size() != numbers.size()) {
-        return false;
-    }
     std::sort(usedNumbers.begin(), usedNumbers.end());
     std::sort(numbers.begin(), numbers.end());
     return usedNumbers == numbers;
@@ -127,11 +116,14 @@ bool evaluator::checkNumbersUsed(const std::string expression, std::vector<int> 
 double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
     std::stack<double> values;
     for (const std::string& token : rpn) {
-        if (std::isdigit(token[0])) {
+        if (!token.empty() && std::isdigit(static_cast<unsigned char>(token[0]))) {
             values.push(std::stod(token));
         }
         //removes and calculates pairs of values in order of operation 
         else if (isOperator(token[0]) && token.length() == 1) {
+            if (values.size() < 2) {
+                throw std::runtime_error("Invalid expression");
+            }
             double b = values.top(); 
             values.pop();
             double a = values.top(); 
@@ -140,11 +132,19 @@ double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
                 case '+': values.push(a + b); break;
                 case '-': values.push(a - b); break;
                 case '*': values.push(a * b); break;
-                case '/': values.push(a / b); break;
+                case '/': 
+                    if (std::fabs(b) < 1e-9) {
+                    throw std::runtime_error("Division by zero");
+                    }
+                    values.push(a / b);
+                    break;
             }
         }
     }
-return values.top();
+    if (values.size() != 1) {
+            throw std::runtime_error("Invalid expression");
+        }
+    return values.top();
 }
 
 //combines expression to rpn converter and rpn evaluator to return a single double value

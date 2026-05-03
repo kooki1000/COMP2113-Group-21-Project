@@ -1,12 +1,13 @@
 /*
  * menu.cpp
- *
+ *SHEIKH SAARIM
  * All the UI screens and menus.
  */
 
 #include "menu.h"
 #include "colors.h"
 #include <cstdio>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -28,6 +29,43 @@ char getch() {
   ch = getchar();
   tcsetattr(STDIN_FILENO, TCSANOW, &oldattr);
   return ch;
+}
+
+// Approximate terminal display width for UTF-8 text (ASCII=1, wide=2).
+static int displayWidthUtf8(const std::string& s) {
+  int width = 0;
+  for (size_t i = 0; i < s.size();) {
+    unsigned char c = static_cast<unsigned char>(s[i]);
+    if (c < 0x80) {
+      width += 1;
+      i += 1;
+      continue;
+    }
+
+    int bytes = 1;
+    if ((c & 0xE0) == 0xC0) bytes = 2;
+    else if ((c & 0xF0) == 0xE0) bytes = 3;
+    else if ((c & 0xF8) == 0xF0) bytes = 4;
+
+    uint32_t code = 0;
+    if (bytes == 2 && i + 1 < s.size()) {
+      code = ((c & 0x1F) << 6) | (static_cast<unsigned char>(s[i + 1]) & 0x3F);
+    } else if (bytes == 3 && i + 2 < s.size()) {
+      code = ((c & 0x0F) << 12)
+           | ((static_cast<unsigned char>(s[i + 1]) & 0x3F) << 6)
+           | (static_cast<unsigned char>(s[i + 2]) & 0x3F);
+    } else if (bytes == 4 && i + 3 < s.size()) {
+      code = ((c & 0x07) << 18)
+           | ((static_cast<unsigned char>(s[i + 1]) & 0x3F) << 12)
+           | ((static_cast<unsigned char>(s[i + 2]) & 0x3F) << 6)
+           | (static_cast<unsigned char>(s[i + 3]) & 0x3F);
+    }
+
+    width += (code >= 0x1100) ? 2 : 1;
+    i += bytes;
+  }
+  
+  return width;
 }
 
 // ----- ASCII ART -----
@@ -97,7 +135,7 @@ void showDefeatArt() {
 // ----- BOX DRAWING -----
 
 void showBox(const std::vector<std::string> &lines, int width) {
-  // Centers the box horizontally: total visual width = width + 2 (borders)
+  // Center the box horizontally: total visual width = width + 2 (borders)
   std::string P = hpad(width + 2);
   std::cout << COLOR_CYAN;
   std::cout << P << "╔";
@@ -106,7 +144,7 @@ void showBox(const std::vector<std::string> &lines, int width) {
 
   for (const std::string &line : lines) {
     std::cout << P << "║" << COLOR_WHITE;
-    int padding = width - (int)line.length();
+    int padding = width - displayWidthUtf8(line);
     int leftPad = padding / 2;
     int rightPad = padding - leftPad;
     std::cout << std::string(leftPad, ' ') << line
@@ -135,14 +173,14 @@ int showMainMenu(const HighScore &highScore) {
     int menuW = std::max(40, std::min(termWmm - 6, 60));
 
     std::vector<std::string> menuItems = {
-        "", "[1]  🎮  NEW GAME",    "", "[2]  💾  LOAD GAME",
-        "", "[3]  🏆  HIGH SCORES", "", "[4]  📖  HOW TO PLAY",
-        "", "[5]  🚪  QUIT",        ""};
+        "", "[1] 🎮  NEW GAME",    "", "[2] 💾  LOAD GAME     ",
+        "", "[3] 🏆  HIGH SCORES     ", "", "[4] 📖  HOW TO PLAY ",
+        "", "[5] 🚪  QUIT ",        ""};
     showBox(menuItems, menuW);
 
     std::string CP = hpad(menuW + 2);
     std::cout << "\n";
-    std::cout << COLOR_YELLOW << CP << "🏆 HIGH SCORE: " << COLOR_BOLD_YELLOW;
+    std::cout << COLOR_YELLOW << CP << "HIGH SCORE: " << COLOR_BOLD_YELLOW;
     std::cout << highScore.score;
     std::cout << COLOR_YELLOW << " (" << getDifficultyColor(highScore.difficulty);
     switch (highScore.difficulty) {
@@ -153,7 +191,7 @@ int showMainMenu(const HighScore &highScore) {
     std::cout << COLOR_YELLOW << ")" << COLOR_RESET << "\n";
 
     if (highScore.defeatedDragon) {
-      std::cout << COLOR_GREEN << CP << "🐉 Dragon Slayer: "
+      std::cout << COLOR_GREEN << CP << "Dragon Slayer: "
                 << highScore.playerName << COLOR_RESET << "\n";
     }
 
@@ -198,13 +236,17 @@ Difficulty selectDifficulty() {
     std::string P = hpad(BW + 2);
 
     // ── Header ──────────────────────────────────────────
-    std::cout << COLOR_BOLD_WHITE
-              << P << "╔" << rep("═", BW) << "╗\n"
-              << P << "║" << rep(" ", (BW-22)/2)
-              << "  ⚔   SELECT DIFFICULTY   ⚔  "
-              << rep(" ", BW-22-(BW-22)/2) << "║\n"
-              << P << "╚" << rep("═", BW) << "╝\n\n"
-              << COLOR_RESET;
+    {
+        const char* htitle = "\xe2\x9a\x94   SELECT DIFFICULTY   \xe2\x9a\x94";
+        int htitleW = 25;  // ⚔ is 1 display col each, total = 1+3+17+3+1 = 25
+        int hleft = (BW - htitleW) / 2;
+        int hright = BW - htitleW - hleft;
+        std::cout << COLOR_BOLD_WHITE
+                  << P << "\xe2\x95\x94" << rep("\xe2\x95\x90", BW) << "\xe2\x95\x97\n"
+                  << P << "\xe2\x95\x91" << rep(" ", hleft) << htitle << rep(" ", hright) << "\xe2\x95\x91\n"
+                  << P << "\xe2\x95\x9a" << rep("\xe2\x95\x90", BW) << "\xe2\x95\x9d\n\n"
+                  << COLOR_RESET;
+    }
 
     // ── Cards ───────────────────────────────────────────
     for (int i = 0; i < 3; i++) {
@@ -288,75 +330,133 @@ Difficulty selectDifficulty() {
 // ----- HIGH SCORES -----
 
 void showHighScores(const std::vector<HighScore> &scores) {
-  // header(3) + gap(1) + table header(3) + 10 rows + footer(1) + prompt(2) = 20
-  clearAndCenterV(20);
-  std::string H = hpad(45);  // header box width
-  std::string T = hpad(58);  // table visual width is 58 chars
+  clearAndCenterV(21);
+
+  const int RANK_W = 8;
+  const int NAME_W = 18;
+  const int SCORE_W = 12;
+  const int DIFF_W = 14;
+  const int DRAGON_W = 10;
+  const int TW = RANK_W + NAME_W + SCORE_W + DIFF_W + DRAGON_W + 6;
+  const int IW = TW - 2;
+  std::string T = hpad(TW);
+
+  auto rep = [](const char* s, int n) {
+    std::string out;
+    for (int i = 0; i < n; i++) out += s;
+    return out;
+  };
+
+  auto padRight = [](std::string text, int visualWidth, int width) {
+    int spaces = width - visualWidth;
+    if (spaces < 0) spaces = 0;
+    return text + std::string(spaces, ' ');
+  };
+
+  auto centerText = [](std::string text, int visualWidth, int width) {
+    int spaces = width - visualWidth;
+    if (spaces < 0) spaces = 0;
+    int left = spaces / 2;
+    int right = spaces - left;
+    return std::string(left, ' ') + text + std::string(right, ' ');
+  };
+
+  auto bar = [&]() {
+    std::cout << COLOR_CYAN << "\xe2\x94\x82" << COLOR_RESET;
+  };
+
+  auto printBorder = [&](const char* left, const char* mid, const char* right) {
+    std::cout << COLOR_CYAN << T << left
+              << rep("\xe2\x94\x80", RANK_W) << mid
+              << rep("\xe2\x94\x80", NAME_W) << mid
+              << rep("\xe2\x94\x80", SCORE_W) << mid
+              << rep("\xe2\x94\x80", DIFF_W) << mid
+              << rep("\xe2\x94\x80", DRAGON_W) << right << "\n"
+              << COLOR_RESET;
+  };
 
   std::cout << COLOR_BOLD_YELLOW;
-  std::cout << H << "╔═══════════════════════════════════════════╗\n";
-  std::cout << H << "║            🏆 HIGH SCORES 🏆              ║\n";
-  std::cout << H << "╚═══════════════════════════════════════════╝\n\n";
+  std::cout << T << "\xe2\x95\x94" << rep("\xe2\x95\x90", IW) << "\xe2\x95\x97\n";
+  std::cout << T << "\xe2\x95\x91" << centerText("[ HIGH SCORES ]", 15, IW) << "\xe2\x95\x91\n";
+  std::cout << T << "\xe2\x95\x9a" << rep("\xe2\x95\x90", IW) << "\xe2\x95\x9d\n\n";
   std::cout << COLOR_RESET;
 
-  std::cout << COLOR_CYAN;
-  std::cout << T << "┌──────┬────────────────┬──────────┬────────────┬────────┐\n";
-  std::cout << T << "│ RANK │     NAME       │  SCORE   │ DIFFICULTY │ DRAGON │\n";
-  std::cout << T << "├──────┼────────────────┼──────────┼────────────┼────────┤\n";
-  std::cout << COLOR_RESET;
+  printBorder("\xe2\x94\x8c", "\xe2\x94\xac", "\xe2\x94\x90");
+  std::cout << T;
+  bar(); std::cout << COLOR_CYAN << centerText("RANK", 4, RANK_W);
+  bar(); std::cout << COLOR_CYAN << centerText("NAME", 4, NAME_W);
+  bar(); std::cout << COLOR_CYAN << centerText("SCORE", 5, SCORE_W);
+  bar(); std::cout << COLOR_CYAN << centerText("DIFFICULTY", 10, DIFF_W);
+  bar(); std::cout << COLOR_CYAN << centerText("DRAGON", 6, DRAGON_W);
+  bar(); std::cout << "\n";
+  printBorder("\xe2\x94\x9c", "\xe2\x94\xbc", "\xe2\x94\xa4");
 
   for (int i = 0; i < 10; i++) {
-    std::cout << T << "│";
+    std::cout << T;
+    bar();
 
-    // Rank with medals for top 3
-    if (i < 3) {
-      const char *medals[] = {"🥇", "🥈", "🥉"};
-      std::cout << "  " << medals[i] << "  │";
+    if (i == 0) {
+     std::cout << COLOR_BOLD_YELLOW << centerText("\xf0\x9f\xa5\x87", 2, RANK_W) << COLOR_RESET;
+    } else if (i == 1) {
+     std::cout << COLOR_BOLD_YELLOW << centerText("\xf0\x9f\xa5\x88", 2, RANK_W) << COLOR_RESET;
+    } else if (i == 2) {
+     std::cout << COLOR_BOLD_YELLOW << centerText("\xf0\x9f\xa5\x89", 2, RANK_W) << COLOR_RESET;
     } else {
-      std::cout << "  " << std::setw(2) << (i + 1) << "  │";
+      std::string rank = std::to_string(i + 1);
+      std::cout << centerText(rank, (int)rank.size(), RANK_W);
     }
+
+    bar();
 
     if (i < (int)scores.size()) {
       const HighScore &hs = scores[i];
 
-      std::cout << " " << std::setw(14) << std::left
-                << hs.playerName.substr(0, 14) << " │";
-      std::cout << COLOR_YELLOW << " " << std::setw(8) << std::right << hs.score
-                << COLOR_RESET << " │";
+      std::string name = hs.playerName.substr(0, NAME_W - 2);
+      std::cout << " " << padRight(name, (int)name.size(), NAME_W - 1);
+      bar();
 
-      std::cout << getDifficultyColor(hs.difficulty);
+      std::string scoreStr = std::to_string(hs.score);
+      std::cout << COLOR_YELLOW << centerText(scoreStr, (int)scoreStr.size(), SCORE_W) << COLOR_RESET;
+      bar();
+
       std::string diffStr;
       switch (hs.difficulty) {
-      case DIFF_EASY:
-        diffStr = "Easy";
-        break;
-      case DIFF_NORMAL:
-        diffStr = "Normal";
-        break;
-      case DIFF_HARD:
-        diffStr = "Hard";
-        break;
+      case DIFF_EASY:   diffStr = "Easy"; break;
+      case DIFF_NORMAL: diffStr = "Normal"; break;
+      case DIFF_HARD:   diffStr = "Hard"; break;
       }
-      std::cout << " " << std::setw(10) << diffStr << COLOR_RESET << " │";
 
-      if (hs.defeatedDragon) {
-        std::cout << "   🐉   │";
-      } else {
-        std::cout << "   -    │";
-      }
+      std::cout << getDifficultyColor(hs.difficulty)
+                << centerText(diffStr, (int)diffStr.size(), DIFF_W)
+                << COLOR_RESET;
+      bar();
+
+      if (hs.defeatedDragon)
+        std::cout << centerText("\xe2\x9c\x85", 2, DRAGON_W);
+      else
+        std::cout << centerText("\xe2\x9d\x8c", 2, DRAGON_W);
+      bar();
     } else {
-      std::cout << "      ---      │    ---   │    ---     │   -    │";
+      std::cout << centerText("", 0, NAME_W);
+      bar();
+      std::cout << centerText("", 0, SCORE_W);
+      bar();
+      std::cout << centerText("", 0, DIFF_W);
+      bar();
+      std::cout << centerText("", 0, DRAGON_W);
+      bar();
     }
+
     std::cout << "\n";
   }
 
-  std::cout << COLOR_CYAN;
-  std::cout << T << "└──────┴────────────────┴──────────┴────────────┴────────┘\n";
-  std::cout << COLOR_RESET;
+  printBorder("\xe2\x94\x94", "\xe2\x94\xb4", "\xe2\x94\x98");
 
-  std::cout << "\n" << COLOR_DIM << T << "Press any key to return to menu..." << COLOR_RESET;
+  std::cout << "\n" << COLOR_DIM << hpad(30)
+            << "Press any key to return to menu..." << COLOR_RESET;
   getch();
 }
+
 
 // ----- HOW TO PLAY -----
 
@@ -385,7 +485,7 @@ void showHowToPlay() {
   std::cout << COLOR_BOLD_WHITE << "\n";
   std::cout << P << "\xe2\x95\x94" << hbar() << "\xe2\x95\x97\n";
   // "📖 HOW TO PLAY 📖" — emoji are 2-wide each, text = 2+1+12+1+2 = 18 display cols
-  std::cout << P << "\xe2\x95\x91" << center("\xf0\x9f\x93\x96 HOW TO PLAY \xf0\x9f\x93\x96", 18) << "\xe2\x95\x91\n";
+  std::cout << P << "\xe2\x95\x91" << center("\xf0\x9f\x93\x96 HOW TO PLAY \xf0\x9f\x93\x96", 17) << "\xe2\x95\x91\n";
   std::cout << P << "\xe2\x95\x9a" << hbar() << "\xe2\x95\x9d\n\n";
   std::cout << COLOR_RESET;
 
@@ -420,12 +520,14 @@ void showHowToPlay() {
   std::cout << P << "2. Craft wooden pickaxe to mine stone\n";
   std::cout << P << "3. Each tier upgrade requires winning a minigame!\n";
   std::cout << P << "4. Mine the Dragon Cave block to enter the lair\n";
-  std::cout << P << "5. Defeat the Dragon in Space Invaders-style combat!\n\n";
+  std::cout << P << "5. Defeat the Dragon!\n\n";
 
   std::cout << COLOR_BOLD_CYAN << P << "MINIGAMES:\n" << COLOR_RESET;
-  std::cout << P << "• " << COLOR_GREEN  << "Wordle"       << COLOR_RESET << " - Guess the word to succeed the mining challenge\n";
-  std::cout << P << "• " << COLOR_YELLOW << "Minesweeper"  << COLOR_RESET << " - Clear the grid to succeed the mining challenge\n";
-  std::cout << P << "• " << COLOR_CYAN   << "Dragon Fight" << COLOR_RESET << " - Final boss battle! Win a minigame to enter.\n\n";
+  std::cout << P << "• " << COLOR_GREEN   << "Wordle"       << COLOR_RESET << " - Guess the word to succeed the mining challenge\n";
+  std::cout << P << "• " << COLOR_YELLOW  << "Minesweeper"  << COLOR_RESET << " - Clear the grid to succeed the mining challenge\n";
+  std::cout << P << "• " << COLOR_CYAN    << "24 Game"      << COLOR_RESET << " - Make 24 using all four card values\n";
+  std::cout << P << "• " << COLOR_MAGENTA << "Sudoku"       << COLOR_RESET << " - Fill the grid so each row, column, and box is unique\n";
+  std::cout << P << "• " << COLOR_BOLD_RED << "Dragon Fight" << COLOR_RESET << " - Final boss battle! Win a minigame to enter.\n\n";
 
   std::cout << COLOR_DIM << P << "Press any key to return to menu..." << COLOR_RESET;
   getch();
@@ -509,8 +611,10 @@ void showGameOver(const GameState &state, bool isVictory) {
 // ----- UTILITY FUNCTIONS -----
 
 bool showConfirmation(const std::string &message) {
-  std::cout << "\n"
-            << COLOR_WARNING << "    " << message << " (Y/N): " << COLOR_RESET;
+  int dispW = (int)message.size() + 10;
+  std::string CP = hpad(dispW);
+  std::cout << "\n" << CP
+            << COLOR_WARNING << message << " (Y/N): " << COLOR_RESET;
   char input = getch();
   return (input == 'y' || input == 'Y');
 }

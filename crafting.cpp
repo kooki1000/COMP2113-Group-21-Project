@@ -287,7 +287,7 @@ void renderCraftingUI(const GameState& state, int selectedIndex) {
     std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_RESET
               << COLOR_BOLD_WHITE << "Selected: " << COLOR_RESET;
     if (visible)
-        std::cout << getMaterialColor(selected.tier) << selected.displayName << COLOR_RESET;
+        std::cout << getTierColor(selected.tier) << selected.displayName << COLOR_RESET;
     else
         std::cout << COLOR_DIM << "??? (Complete previous tier)" << COLOR_RESET;
     RB();
@@ -426,78 +426,103 @@ void openCraftingMenu(GameState& state) {
 // Effects:
 // - Clears the screen, prints inventory and equipment, and waits for a keypress.
 void showInventory(const GameState& state) {
-    clearScreen();
+    int termCols, termRows;
+    getTermSize(termCols, termRows);
+    const int BW = 60;
 
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╔════════════════════════════════════════════════════════════════╗\n";
-    std::cout << "║                    " << COLOR_BOLD_YELLOW << "📦 INVENTORY 📦" << COLOR_BOLD_CYAN
-              << "                      ║\n";
-    std::cout << "╠════════════════════════════════════════════════════════════════╣\n";
-    std::cout << COLOR_RESET;
+    int leftPad = (termCols - BW - 2) / 2;
+    if (leftPad < 0) leftPad = 0;
+    int rightCol = leftPad + BW + 2;
 
-    // Resources section
-    std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_WHITE << "RESOURCES" << COLOR_BOLD_CYAN
-              << std::string(58, ' ') << "║\n"
-              << COLOR_RESET;
-
-    auto printResource = [&](const char* emoji, const char* color, const char* name, int count, int width = 60) {
-        std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
-        std::cout << color << emoji << " " << std::left << std::setw(12) << name << COLOR_RESET;
-        std::cout << ": " << std::setw(4) << count;
-        std::cout << COLOR_BOLD_CYAN << std::string(width - 25, ' ') << "║\n"
+    std::string PAD(leftPad, ' ');
+    auto RB = [&]() {
+        std::cout << "\033[" << rightCol << "G" << COLOR_BOLD_CYAN << "║\n"
                   << COLOR_RESET;
     };
 
-    printResource("🪵", COLOR_WOOD, "Wood", state.player.inventory.wood);
-    printResource("🪨", COLOR_STONE, "Stone", state.player.inventory.stone);
-    printResource("⚙️ ", COLOR_IRON, "Iron", state.player.inventory.iron);
-    printResource("🪙", COLOR_GOLD_ORE, "Gold", state.player.inventory.gold);
-    printResource("💎", COLOR_DIAMOND, "Diamond", state.player.inventory.diamond);
+    auto border = [&]() {
+        std::cout << COLOR_BOLD_CYAN;
+        for (int i = 0; i < BW; i++) std::cout << "═";
+    };
 
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╠════════════════════════════════════════════════════════════════╣\n";
-    std::cout << COLOR_RESET;
+    bool fullDiamond = (state.player.equipment.armor == MATERIAL_DIAMOND &&
+                        state.player.equipment.pickaxe == MATERIAL_DIAMOND);
 
-    // Equipment section
-    std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_WHITE << "EQUIPMENT" << COLOR_BOLD_CYAN
-              << std::string(58, ' ') << "║\n"
+    int totalLines = fullDiamond ? 18 : 15;
+    int topPad = (termRows - totalLines) / 2;
+
+    if (topPad < 0) topPad = 0;
+
+    clearScreen();
+    if (topPad > 0) std::cout << std::string(topPad, '\n');
+
+    std::cout << PAD << COLOR_BOLD_CYAN << "╔";
+    border();
+    std::cout << "╗\n"
+              << COLOR_RESET;
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_YELLOW << "INVENTORY" << COLOR_RESET;
+    RB();
+    std::cout << PAD << COLOR_BOLD_CYAN << "╠";
+    border();
+    std::cout << "╣\n"
               << COLOR_RESET;
 
-    std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
-    std::cout << "⛏️  Pickaxe: " << getMaterialColor(state.player.equipment.pickaxe)
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_WHITE << "RESOURCES" << COLOR_RESET;
+    RB();
+
+    auto printResource = [&](const char* color, const char* name, int count) {
+        std::cout << PAD << COLOR_BOLD_CYAN << "║   " << COLOR_RESET;
+        std::cout << color << std::left << std::setw(12) << name << COLOR_RESET
+                  << ": " << std::setw(4) << count;
+        RB();
+    };
+
+    printResource(COLOR_WOOD, "Wood", state.player.inventory.wood);
+    printResource(COLOR_STONE, "Stone", state.player.inventory.stone);
+    printResource(COLOR_IRON, "Iron", state.player.inventory.iron);
+    printResource(COLOR_GOLD_ORE, "Gold", state.player.inventory.gold);
+    printResource(COLOR_DIAMOND, "Diamond", state.player.inventory.diamond);
+
+    std::cout << PAD << COLOR_BOLD_CYAN << "╠";
+    border();
+    std::cout << "╣\n"
+              << COLOR_RESET;
+
+    std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_WHITE << "EQUIPMENT" << COLOR_RESET;
+    RB();
+    std::cout << PAD << COLOR_BOLD_CYAN << "║   " << COLOR_RESET
+              << "Pickaxe: " << getMaterialColor(state.player.equipment.pickaxe)
               << getMaterialName(state.player.equipment.pickaxe) << COLOR_RESET;
-    std::cout << COLOR_BOLD_CYAN << std::string(37, ' ') << "║\n"
-              << COLOR_RESET;
-
-    std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
-    std::cout << "🛡️  Armor:   " << getMaterialColor(state.player.equipment.armor)
+    RB();
+    std::cout << PAD << COLOR_BOLD_CYAN << "║   " << COLOR_RESET
+              << "Armor:   " << getMaterialColor(state.player.equipment.armor)
               << getMaterialName(state.player.equipment.armor) << COLOR_RESET;
-    std::cout << COLOR_BOLD_CYAN << std::string(37, ' ') << "║\n"
-              << COLOR_RESET;
-
-    std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_RESET;
-    std::cout << "❤️  Health:  " << COLOR_HEALTH << state.player.health << "/"
+    RB();
+    std::cout << PAD << COLOR_BOLD_CYAN << "║   " << COLOR_RESET
+              << "Health:  " << COLOR_HEALTH << state.player.health << "/"
               << state.player.maxHealth << COLOR_RESET;
-    std::cout << COLOR_BOLD_CYAN << std::string(40, ' ') << "║\n"
-              << COLOR_RESET;
+    RB();
 
-    // Special message for full diamond
-    if (state.player.equipment.armor == MATERIAL_DIAMOND &&
-        state.player.equipment.pickaxe == MATERIAL_DIAMOND) {
-        std::cout << COLOR_BOLD_CYAN << "╠════════════════════════════════════════════════════════════════╣\n";
-        std::cout << COLOR_RESET;
-        std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_YELLOW << "⭐ FULL DIAMOND ACHIEVED! ⭐"
-                  << COLOR_BOLD_CYAN << std::string(32, ' ') << "║\n"
+    if (fullDiamond) {
+        std::cout << PAD << COLOR_BOLD_CYAN << "╠";
+        border();
+        std::cout << "╣\n"
                   << COLOR_RESET;
-        std::cout << COLOR_BOLD_CYAN << "║ " << COLOR_DIM << "The elder awaits at the dragon carcass..."
-                  << COLOR_BOLD_CYAN << std::string(25, ' ') << "║\n"
-                  << COLOR_RESET;
+        std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_BOLD_YELLOW
+                  << "** FULL DIAMOND ACHIEVED! **" << COLOR_RESET;
+        RB();
+        std::cout << PAD << COLOR_BOLD_CYAN << "║ " << COLOR_DIM
+                  << "The elder awaits at the dragon carcass..." << COLOR_RESET;
+        RB();
     }
 
-    std::cout << COLOR_BOLD_CYAN;
-    std::cout << "╚════════════════════════════════════════════════════════════════╝\n";
-    std::cout << COLOR_RESET;
+    std::cout << PAD << COLOR_BOLD_CYAN << "╚";
+    border();
+    std::cout << "╝\n"
+              << COLOR_RESET;
 
-    std::cout << COLOR_DIM << "\n    Press any key to continue..." << COLOR_RESET;
+    std::string PP = hpad(30);
+    std::cout << COLOR_DIM << "\n"
+              << PP << "Press any key to continue..." << COLOR_RESET;
     getch();
 }
