@@ -1,9 +1,17 @@
-/*
- * menu.h
- * 
- * All the UI screens - main menu, difficulty select, game over, etc.
- * Also handles the in-game HUD (health bar, inventory display).
- */
+// =============================================================================
+// menu.h
+// TermiCraft — UI Screens & HUD Interface
+//
+// Public interface for all menus, screens, and HUD functions in menu.cpp.
+// Any module that needs to show a screen or draw the HUD should include this.
+//
+// Also declares g_minigameForfeited — a global flag set when the player
+// exits a minigame early, so the game loop knows to apply the forfeit penalty
+// instead of a normal pass/fail result.
+//
+// Author:       Sheikh Mohammad Saarim
+// Dependencies: types.h
+// =============================================================================
 
 #ifndef MENU_H
 #define MENU_H
