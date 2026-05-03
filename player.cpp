@@ -54,41 +54,26 @@ void initPlayer(GameState& state, const std::string& playerName) {
     // Spawn at the forest biome surface (col 10, just above ground level).
     // Walk down from sky until we hit the first non-sky, non-air block, then
     // stand one row above it so the player is on the surface grass.
-    int spawnX = 10;
-    int spawnY = SURFACE_LEVEL - 1;  // default fallback
-    for (int y = 0; y < state.worldHeight - 1; y++) {
-        BlockType t = state.world[y][spawnX].type;
-        if (t != BLOCK_SKY && t != BLOCK_AIR) {
-            spawnY = y - 1;  // stand one row above first solid block
-            if (spawnY < 0) spawnY = 0;
-            break;
+    {
+        int spawnX = 10;
+        int spawnY = SURFACE_LEVEL - 1;  // default fallback
+
+        for (int y = 0; y < state.worldHeight - 1; y++) {
+            BlockType t = state.world[y][spawnX].type;
+            if (t != BLOCK_SKY && t != BLOCK_AIR) {
+                spawnY = y - 1;  // stand one row above first solid block
+                if (spawnY < 0) spawnY = 0;
+                break;
+            }
         }
+
+        state.player.pos = Position(spawnX, spawnY);
     }
-    state.player.pos = Position(spawnX, spawnY);
 
     // Initialize camera to center player
     updateCamera(state);
 
     state.lastMessage = "Welcome, " + playerName + "! Mine resources to survive.";
-}
-
-// Initialize ore minigame assignments (Stone, Iron, Gold, Diamond)
-void initializeOreMinigames(GameState& state) {
-    if (state.minigameSlotsInitialized) return;
-
-    // Array of 4 minigame types
-    MinigameType games[] = {MINIGAME_WORDLE, MINIGAME_MINESWEEPER, MINIGAME_SUDOKU, MINIGAME_PLACEHOLDER_4TH};
-
-    // Shuffle using rng
-    std::shuffle(games, games + 4, rng);
-
-    // Assign to ores: Stone[0], Iron[1], Gold[2], Diamond[3]
-    for (int i = 0; i < 4; i++) {
-        state.oreMinigameSlots[i] = games[i];
-        state.oreMinigameTriggered[i] = false;
-    }
-
-    state.minigameSlotsInitialized = true;
 }
 
 // Check if block type is solid (impassable)
@@ -191,12 +176,16 @@ void updateCamera(GameState& state) {
 
 // Select random minigame using MINIGAME_COUNT constant
 void selectRandomMinigame(GameState& state) {
-    int r = rand() % MINIGAME_COUNT;  // Uses constant from types.h
+    int r = rand() % MINIGAME_COUNT;
 
     if (r == 0) {
         state.currentMinigame = MINIGAME_WORDLE;
-    } else {
+    } else if (r == 1) {
         state.currentMinigame = MINIGAME_MINESWEEPER;
+    } else if (r == 2) {
+        state.currentMinigame = MINIGAME_TWENTYFOUR;
+    } else {
+        state.currentMinigame = MINIGAME_SUDOKU;
     }
 }
 
@@ -260,7 +249,17 @@ void initiateMining(GameState& state) {
     state.minigameActive = true;
     state.phase = PHASE_MINIGAME;
 
-    std::string gameName = (state.currentMinigame == MINIGAME_WORDLE) ? "Wordle" : "Minesweeper";
+    std::string gameName =
+        (state.currentMinigame == MINIGAME_WORDLE)
+            ? "Wordle"
+        : (state.currentMinigame == MINIGAME_MINESWEEPER)
+            ? "Minesweeper"
+        : (state.currentMinigame == MINIGAME_TWENTYFOUR)
+            ? "24 Game"
+        : (state.currentMinigame == MINIGAME_SUDOKU)
+            ? "Sudoku"
+            : "Wordle";
+
     state.lastMessage = "Mining challenge: " + gameName + "!";
 }
 
@@ -474,31 +473,8 @@ void consumeResourcesForTier(GameState& state, MaterialTier tier) {
 }
 
 // Check if crafting should trigger minigame (Iron, Gold, Diamond)
-bool checkCraftingProgression(GameState& state) {
-    MaterialTier newPick = state.player.equipment.pickaxe;
-
-    // Only trigger for Iron (3) and above
-    if (newPick > MATERIAL_STONE) {
-        // Check if we haven't already triggered for this tier
-        if (newPick != state.pendingUpgrade) {
-            state.pendingUpgrade = newPick;
-
-            selectRandomMinigame(state);
-
-            // Signal the main loop to run the minigame
-            state.phase = PHASE_MINIGAME;
-            state.minigameActive = true;
-            state.miningPending = true;  // reuse flag — main loop checks this
-            // Store player pos as the "pending" position so trySpawnEnemy has valid coords
-            state.pendingMinePos = state.player.pos;
-            state.pendingMineType = BLOCK_AIR;  // not a real mine, just a crafting trial
-
-            std::string tierName = getMaterialName(newPick);
-            state.lastMessage = "Rite of Passage: Prove yourself to wield " + tierName + "!";
-            return true;
-        }
-    }
-
+bool checkCraftingProgression(GameState&) {
+    // Minigames only trigger during mining, not crafting
     return false;
 }
 
