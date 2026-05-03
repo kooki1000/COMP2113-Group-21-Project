@@ -1,5 +1,5 @@
 // =============================================================================
-// evaluator.cpp
+// equationevaluator.cpp
 // TermiCraft — Expression Evaluator Module Implementation
 //
 // Full implementation of a safe mathematical expression evaluator for the
@@ -37,10 +37,12 @@
 #include <stack>
 #include <stdexcept>
 
+//Checks if a char is an operator
 bool evaluator::isOperator(char c) {
     return precedence.find(c) != precedence.end();
 }
 
+//Converts the user input expression into reverse polish notation (rpn) for easy calculation
 std::vector<std::string> evaluator::shunting_yard(const std::string& expression) {
     std::vector<std::string> output;
     std::stack<char> operators;
@@ -105,6 +107,7 @@ std::vector<std::string> evaluator::shunting_yard(const std::string& expression)
     return output;
 }
 
+//Evaluates the rpn expression using a stack 
 double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
     std::stack<double> values;
 
@@ -149,11 +152,13 @@ double evaluator::evaluate_rpn(const std::vector<std::string>& rpn) {
     return values.top();
 }
 
+//Combines the evaluation algorithm and the conversion algorithm
 double evaluator::evaluate(const std::string& expression) {
     std::vector<std::string> rpn = shunting_yard(expression);
     return evaluate_rpn(rpn);
 }
 
+//Checks if all the numbers in the puzzle are used
 bool evaluator::checkNumbersUsed(const std::string& expression, std::vector<int> numbers) {
     std::vector<std::string> rpn = shunting_yard(expression);
     std::vector<int> usedNumbers;
