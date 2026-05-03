@@ -3,7 +3,7 @@
  *
  * Shared data structures for TermiCraft — everyone includes this.
  * If you're adding new structs or enums, put them here so the whole team can use them.
- *
+ * Sheikh Mohammad Saarim
  * DON'T modify existing structs without telling the group chat first.
  */
 
@@ -24,7 +24,7 @@ const int STONE_LEVEL   = 12;   // stone layer begins
 const int GOLD_LEVEL    = 30;   // gold layer begins
 const int DIAMOND_LEVEL = 50;   // diamond layer begins
 const int DEEP_LEVEL    = 25;   // rare ores spawn below this
-const int MINIGAME_COUNT = 2;   // Total number of available minigames
+const int MINIGAME_COUNT = 4;   // Total number of available minigames
 
 // Block types - used in the world grid
 enum BlockType {
@@ -62,9 +62,11 @@ enum Difficulty {
 
 // Minigame types
 enum MinigameType {
-    MINIGAME_NONE       = 0,
-    MINIGAME_WORDLE     = 1,
-    MINIGAME_MINESWEEPER = 2
+    MINIGAME_NONE        = 0,
+    MINIGAME_WORDLE      = 1,
+    MINIGAME_MINESWEEPER = 2,
+    MINIGAME_TWENTYFOUR  = 3,
+    MINIGAME_SUDOKU      = 4
 };
 
 // Random event types
@@ -193,12 +195,14 @@ struct DifficultySettings {
     float scoreMultiplier;
     int wordleWordLength;
     int minesweeperSize;
+    int twentyFourAttempts;
+    int twentyFourTimeLimit;
     int minigameDamage;
 
     DifficultySettings() : name("Normal"), playerHealth(100),
         enemyHealthMult(100), oreSpawnRate(100), enemySpawnChance(15),
         scoreMultiplier(1.5f), wordleWordLength(5), minesweeperSize(8),
-        minigameDamage(20) {}
+        twentyFourAttempts(3), twentyFourTimeLimit(90), minigameDamage(20) {}
 };
 
 struct HighScore {
@@ -324,9 +328,11 @@ inline DifficultySettings getDifficultySettings(Difficulty diff) {
             s.oreSpawnRate     = 130;
             s.enemySpawnChance = 10;
             s.scoreMultiplier  = 1.0f;
-            s.wordleWordLength = 4;
-            s.minesweeperSize  = 6;
-            s.minigameDamage   = 10;
+            s.wordleWordLength   = 4;
+            s.minesweeperSize    = 6;
+            s.twentyFourAttempts = 5;
+            s.twentyFourTimeLimit = 180;
+            s.minigameDamage     = 10;
             break;
         case DIFF_NORMAL:
             s.name             = "Normal";
@@ -335,9 +341,11 @@ inline DifficultySettings getDifficultySettings(Difficulty diff) {
             s.oreSpawnRate     = 100;
             s.enemySpawnChance = 15;
             s.scoreMultiplier  = 1.5f;
-            s.wordleWordLength = 5;
-            s.minesweeperSize  = 8;
-            s.minigameDamage   = 20;
+            s.wordleWordLength   = 5;
+            s.minesweeperSize    = 8;
+            s.twentyFourAttempts = 3;
+            s.twentyFourTimeLimit = 90;
+            s.minigameDamage     = 20;
             break;
         case DIFF_HARD:
             s.name             = "Hard";
@@ -346,9 +354,11 @@ inline DifficultySettings getDifficultySettings(Difficulty diff) {
             s.oreSpawnRate     = 70;
             s.enemySpawnChance = 25;
             s.scoreMultiplier  = 2.0f;
-            s.wordleWordLength = 6;
-            s.minesweeperSize  = 10;
-            s.minigameDamage   = 30;
+            s.wordleWordLength   = 6;
+            s.minesweeperSize    = 10;
+            s.twentyFourAttempts = 1;
+            s.twentyFourTimeLimit = 30;
+            s.minigameDamage     = 30;
             break;
     }
     return s;
