@@ -78,59 +78,311 @@ Implements the core player entity with real-time keyboard input handling (WASD m
 
 ### World Generation (`world_gen.h`, `world_gen.cpp`)
 
-Procedurally generates the 200×80 TermiCraft world using deterministic hash-based randomness seeded by `state.seed`. Creates three distinct biomes—Forest (cols 0–49), Cave (cols 50–139), and Light Cave (cols 140–199)—each with unique terrain height profiles, vegetation density, and ore distributions. Implements smooth multi-octave noise for surface hills, normal-distribution sampling for tree heights, and winding cave tunnel generation with branching paths. The dragon portal is deterministically placed in the Light Cave biome.
+Procedurally builds the full 200×80 TermiCraft world from a single integer seed.
+All terrain, ores, trees, caves, and structures are generated deterministically —
+the same seed always produces a byte-for-byte identical world.
+Generation is split across two public functions declared in `world_gen.h`:
+`initWorld()` allocates the grid, and `generateWorld()` fills it.
+
+The world is divided into three horizontal biomes:
+
+- **Forest** (cols 0–49)
+  - Dramatic rolling hills with amplitude multiplier 1.2
+  - Surface height clamped to ±6 rows from `SURFACE_LEVEL`
+  - Tree density ~20%, trunk heights normally distributed in [3, 8]
+  - One tree near cols 2–6 is always guaranteed on spawn
+  - Rich ore deposits beginning at `STONE_LEVEL`
+
+- **Cave** (cols 50–139)
+  - Moderate surface hills (amplitude 0.5, ±2 rows)
+  - Tree density ~10%, shorter trunks in [2, 6]
+  - A winding main tunnel 6 wide × 5 tall
+  - Tunnel centreline descends from row ~20 to row ~45
+  - 4–6 diagonal branch tunnels, each 20–30 steps long
+  - Grassy floor strip placed 3 rows below each tunnel centre
+
+- **Light Cave** (cols 140–199)
+  - Hollowed cavern: rows 20–65 cleared to `BLOCK_AIR`
+  - Open sky in rows 0–19, same as the overworld
+  - Hilly grass floor at approximately row 50 (±7 rows)
+  - Short trees at ~5% density, trunks in [2, 4]
+  - Dragon portal: 3×4 `BLOCK_DRAGON_CAVE` centred in the biome
+  - Smooth connector tunnel bridging the main cave exit to the cavern entrance
+
+Generation inside `generateWorld()` follows a strict nine-step pipeline:
+
+1. Fill every block with hidden `BLOCK_STONE` (the baseline)
+2. Build surface heightmap via three-octave smooth noise
+3. Stamp sky, grass, dirt, ores, and bedrock per column
+4. Mark surface rows immediately visible on spawn
+5. Place trees per biome with density and height distributions
+6. Carve the main cave tunnel with a biased random walk
+7. Carve 4–6 diagonal branch tunnels off the main passage
+8. Hollow the light cave, rebuild its floor, place the dragon portal
+9. Carve the forest-to-cave entrance slope and the cave-to-light-cave connector
 
 **How coding elements are met:**
 
-- **Random events (Element 1):** Uses a custom deterministic hash (`worldHash()`) with bit-mixing instead of `rand()`. This generates reproducible pseudo-randomness for terrain height offsets, ore placement probabilities (Diamond 2% below row 50, Gold 3% below row 30, Iron 15% below row 12), tree distribution (20%/10%/5% by biome), and cave branch geometry. The same seed always produces the identical world layout.
+- **Random events (Element 1):**
+  All procedural decisions are driven by `worldHash()` — a custom 32-bit hash
+  using prime coordinate multipliers (2971, 31337) and the MurmurHash2 mixing
+  constant `0x5bd1e995` with two XOR-shift avalanche passes.
+  Two independent channels are used to prevent correlation at the same cell:
+  `hashPercent()` is the primary channel;
+  `hashPercent2()` XORs the seed with `0xDEADBEEF` and offsets coordinates.
+  Ore spawn rates are depth-gated:
+  - Diamond: 2% chance below row 50 (channel 1)
+  - Gold:    3% chance below row 30 (channel 2, independent of diamond)
+  - Iron:   15% chance below row 12 (channel 1, shifted input)
+  Tree trunk heights use `normalTrunkHeight()`, which sums 6 uniform samples
+  to approximate a normal distribution via the Central Limit Theorem.
+  No `rand()` or `srand()` is used anywhere in this module.
 
-- **Data structures (Element 2):** Defines and manipulates the `Block**` 2D array allocated in `initWorld()`. Uses `std::vector<int>` for surface heightmaps (`heightmap`), cave centerline tracking (`cavePath`), and biome boundary calculations (Forest/Cave/Light Cave column ranges). Relies on the `BlockType` enum and `Block` struct from `types.h` to populate the grid with terrain, ores, and structures.
+- **Data structures (Element 2):**
+  The world is stored as a `Block**` pointer-to-pointer array,
+  with one heap-allocated `Block[]` row per world row.
+  Three `std::vector<int>` buffers are used during generation:
+  - `heightmap[x]`      — grass row index for each column
+  - `cavePath[x]`       — cave centreline row for each column
+  - `lightCaveFloor[x]` — light cave floor row for each column
+  Biome boundaries (forestEnd, caveEnd, lightStart, lightEnd)
+  are computed as integer percentages of the world width.
+  Block content is represented by the `BlockType` enum and `Block` struct
+  imported from `types.h`.
+  All internal helpers are declared `static` to prevent symbol leakage
+  to other translation units.
 
-- **Dynamic memory management (Element 3):** `initWorld()` allocates the world grid dynamically: `new Block*[height]` for row pointers, then `new Block[width]` for each column array. This memory is managed by the `GameState` lifecycle and freed when the state is destroyed, allowing runtime-sized worlds while maintaining RAII principles.
+- **Dynamic memory management (Element 3):**
+  `initWorld()` allocates the world grid in two heap passes:
+  - `new Block*[worldHeight]` for the outer row-pointer array
+  - `new Block[worldWidth]`  for each individual row
+  The resulting `Block**` is stored in `state.world`.
+  `worldWidth` is derived from the runtime viewport size,
+  so the allocation size is not known at compile time.
+  The caller is responsible for freeing with paired `delete[]` loops.
+  No static or global arrays are used for the world grid.
 
-- **File I/O (Element 4):** Does not perform direct file operations. World persistence is handled through integration with `fileio.cpp`, which serializes the `Block**` grid and seed value via `GameState` save/load routines.
+- **File I/O (Element 4):**
+  World generation does not directly read or write files.
+  Because generation is fully deterministic from `state.seed`,
+  `fileio.cpp` only needs to save the seed and the per-block
+  `visible` and `mined` flags — not the full terrain layout.
+  On load, `generateWorld()` is called again to reconstruct block types,
+  then the saved flags are overlaid to restore exploration and mining progress.
 
-- **Multiple files (Element 5):** Split across `world_gen.h` (public API: `initWorld`, `generateWorld`) and `world_gen.cpp` (implementation). Integrates with `types.h` for block definitions and constants, and uses `<algorithm>`, `<vector>`, and `<cmath>` for generation algorithms.
+- **Multiple files (Element 5):**
+  `world_gen.h` declares only the two public functions:
+  `initWorld()` and `generateWorld()`.
+  `world_gen.cpp` contains all internal helpers:
+  `worldHash`, `hashPercent`, `hashPercent2`, `normalTrunkHeight`,
+  `clamp`, `smoothNoiseWG`, `terrainHeightWG`, `buildSurfaceHeightmap`,
+  `placeTree`, `pickOre`, and the full `generateWorld()` pipeline.
+  Standard library dependencies: `<algorithm>`, `<vector>`, `<cmath>`, `<cstring>`.
 
-- **Difficulty levels (Element 6):** While the world seed is consistent across difficulty settings, the three biomes create a natural difficulty gradient. Forest (dramatic hills, abundant wood) is beginner-friendly; Cave (sparse surface, winding tunnels) requires exploration; Light Cave (deep, narrow visibility) contains the endgame portal. Ore rarity increases with depth (Iron → Gold → Diamond), gating equipment progression.
+- **Difficulty levels (Element 6):**
+  The three biomes create a spatial difficulty gradient:
+  - Forest: beginner-friendly, abundant wood, shallow ores, open terrain
+  - Cave: requires tunnel navigation, limited visibility, deeper ore targets
+  - Light Cave: endgame zone, deep placement, dragon portal as the final objective
+  Ore depth-gating paces equipment progression naturally:
+  Iron (row 12) → pickaxe upgrade → Gold (row 30) → Diamond (row 50).
+  This gradient applies regardless of the explicit difficulty setting.
 
 ---
 
 ### Fog of War (`fog_of_war.h`, `fog_of_war.cpp`)
 
-Manages visibility revelation and all world rendering. Implements a depth-based visibility radius: surface and dirt layers are always visible, the stone layer reveals a 3-block circular radius around the player, and deep layers reveal only 2 blocks. Uses a single 700KB static buffer and one `write()` syscall per frame to eliminate tearing. Renders the world grid, entities (player, enemies), HUD (HP bars, inventory, equipment), and delegates sky rendering to the day/night module.
+Controls which blocks the player can see and owns the entire world rendering pipeline.
+Visibility is governed by a depth-zone model:
+surface and dirt rows are always fully visible,
+the stone layer grants a circular reveal radius of 3 blocks around the player,
+and the deep layer reduces this to 2 blocks.
+Once revealed, a block stays visible permanently — exploration is one-way.
+
+All rendering (world cells, entities, HUD, status line) is assembled into a single
+700KB static buffer (`renderBuf[700000]`) and flushed to the terminal with one
+`write(STDOUT_FILENO, renderBuf, pos)` call per frame.
+This eliminates tearing by making the entire screen update atomic.
+
+`updateWorldVisibility()` runs two passes each tick:
+
+- **Pass 1 (surface sweep):**
+  Every viewport cell whose world Y is below `STONE_LEVEL` is marked visible
+  regardless of player position, so the landscape is always fully shown.
+
+- **Pass 2 (circular underground reveal):**
+  A (2r+1)×(2r+1) square is iterated centred on the player,
+  and cells with Euclidean distance ≤ r are permanently marked visible.
+  Skipped entirely if the player is at the surface (radius returns −1).
+
+`renderWorld()` processes each viewport cell through a seven-priority chain:
+
+1. Player `@` — bright yellow, always on top
+2. Alive enemy `B` — bold red, drawn over terrain
+3. Out-of-bounds — sky cell (row ≤ `SURFACE_LEVEL + 1`) or black void
+4. `BLOCK_SKY` or surface `BLOCK_AIR` — delegated to `renderSkyCell()`
+5. `!b.visible` — dark grey colon `:` (fog of war)
+6. Inside red-zone radius — red background with white block character
+7. Normal visible block — colour from `getBlockColor()` + character from `getBlockChar()`
+
+After the viewport, `appendHUD()` adds four HUD lines to the same buffer:
+
+- Line 1: 20-segment HP bar with colour gradient + score + pickaxe + armour tier
+- Line 2: Inventory counts (T / # / I / G / D) + facing arrow + depth + world coordinates
+- Line 3: Fire zone alert, blinking red/yellow when `EVENT_RED_ZONE` is active
+- Line 4: Status message, coloured green for info or red when it contains "Failed", "Need", or "BURNING"
 
 **How coding elements are met:**
 
-- **Random events (Element 1):** Star field rendering in the sky uses deterministic hash-based randomness (`isStarAt` in `day_night.cpp` called via delegate) to scatter stars consistently but irregularly across the night sky.
+- **Random events (Element 1):**
+  The fire zone (`EVENT_RED_ZONE`) alert blink is driven by `ev.alertTicks`:
+  the expression `(ev.alertTicks / 8) % 2` alternates the message
+  between bold red block-bordered text and a plain yellow warning every 8 ticks.
+  Star field rendering in sky cells uses `isStarAt()` from `day_night.cpp`
+  via `renderSkyCell()`, producing a stable hash-based star distribution.
+  The red zone tint check uses Manhattan distance (`abs(dx) + abs(dy) ≤ ev.radius`)
+  to create a diamond-shaped danger region rather than a square.
 
-- **Data structures (Element 2):** Operates on the `Block**` grid from `GameState`, reading `visible` boolean flags set during exploration. Accesses `std::vector<Enemy>` for entity positions, and uses `GameState` camera coordinates (`state.camera.x/y`) and viewport dimensions to calculate the view frustum.
+- **Data structures (Element 2):**
+  Operates directly on `state.world` (the `Block**` grid from `GameState`),
+  reading `b.type` and `b.visible` for each cell.
+  Accesses `std::vector<Enemy>` for entity positions —
+  the enemy loop scans the full vector and breaks on the first live match.
+  Uses `state.camera.x / y` and `state.viewportWidth / Height`
+  to convert between viewport and world coordinate spaces.
+  The `RandomEvent` struct is read for red-zone centre, radius, and alert state.
 
-- **Dynamic memory management (Element 3):** Uses a statically allocated 700KB char buffer (`renderBuf[700000]`) to compose the entire frame (world + HUD + status) before output. This avoids heap fragmentation and malloc overhead during the render loop, ensuring consistent 20-tick-per-second performance.
-- **File I/O (Element 4):** Not directly implemented. Rendering state is transient and derived from `GameState`; persistence is delegated to `fileio.cpp` for save/load operations.
+- **Dynamic memory management (Element 3):**
+  Uses a statically allocated 700KB `char renderBuf[700000]` at file scope.
+  This avoids heap allocation and `malloc` overhead during the render loop,
+  ensuring predictable latency at 20 ticks per second.
+  The buffer is large enough for 100 columns × 50 rows × ~30 bytes per cell
+  plus generous HUD and ANSI escape headroom.
+  No per-frame allocation or deallocation occurs in the rendering path.
 
-- **Multiple files (Element 5):** Split across `fog_of_war.h` (interface) and `fog_of_war.cpp` (implementation). Integrates with `day_night.h` for sky cell rendering, `colors.h` for block ANSI color codes, and `types.h` for state structures.
-- **Difficulty levels (Element 6):** `getVisibilityRadius()` implements tiered visibility: unlimited above `STONE_LEVEL`, radius 3 for stone layer, and radius 2 for deep layers. This creates escalating difficulty as the player descends—deeper areas require more careful navigation with limited sight lines.
+- **File I/O (Element 4):**
+  No file operations are performed.
+  The render buffer is transient — it is rewritten from scratch every frame.
+  Persistent state (visibility flags, player stats) is saved and loaded
+  by `fileio.cpp` operating on `GameState`.
+
+- **Multiple files (Element 5):**
+  `fog_of_war.h` declares three public functions:
+  `getVisibilityRadius()`, `updateWorldVisibility()`, and `renderWorld()`.
+  `fog_of_war.cpp` implements these and the internal `appendHUD()` helper,
+  which is `static` and not exposed in the header.
+  Dependencies: `day_night.h` (sky rendering), `colors.h` (block colours/characters),
+  `types.h` (GameState, Block, Enemy, RandomEvent), `<unistd.h>` (write syscall).
+
+- **Difficulty levels (Element 6):**
+  `getVisibilityRadius()` directly encodes the difficulty gradient underground:
+  - Above `STONE_LEVEL`: unlimited visibility (safe surface exploration)
+  - Stone layer (< `DEEP_LEVEL`): radius 3 (moderate underground visibility)
+  - Deep layer (≥ `DEEP_LEVEL`): radius 2 (tight fog, high tension)
+  The red zone HUD alert escalates pressure during `EVENT_RED_ZONE` events,
+  flashing more aggressively as `alertTicks` counts down.
 
 ---
 
 ### Day/Night Cycle (`day_night.h`, `day_night.cpp`)
 
-Drives the atmospheric lighting and sky animation. A full cycle lasts 6000 ticks (~5 minutes at 20 ticks/sec), progressing through Day, Dusk, Night, and Dawn phases. Renders a moving sun and moon with ASCII art that traverse the sky based on time, changes background ANSI colors (bright blue → orange → navy → pink), and scatters deterministic stars during night phases. Exposes `renderSkyCell()` which is called by the Fog of War renderer for every sky block.
+Drives the atmospheric lighting and sky animation across a 6000-tick full cycle,
+equivalent to approximately 5 minutes at 20 ticks per second.
+The cycle progresses through four named phases:
+
+- **TIME_DAY**   — ticks 0–2399   — bright azure blue sky, sun traverses left to right
+- **TIME_DUSK**  — ticks 2400–2999 — warm orange sky, sun slides off the right edge
+- **TIME_NIGHT** — ticks 3000–5099 — dark navy sky, moon rises, stars appear
+- **TIME_DAWN**  — ticks 5100–5999 — muted pink sky, moon sets, sun begins to rise
+
+The global `tickCount` (defined in `day_night.cpp`, declared `extern` in `day_night.h`)
+is the single source of truth for game time.
+Only `tickDayCycle()` writes to it; all other modules read it via the header.
+
+The sun and moon are rendered using 3-line ASCII art:
+
+```
+Sun:            Moon:
+ \|/             _
+- O -           ( )
+ /|\             ~
+```
+
+Their horizontal positions are computed as linear interpolations across the
+viewport width, parameterised by progress through the current phase.
+During TIME_NIGHT the sun returns −100 (off-screen); during TIME_DAY the moon does the same.
+
+`renderSkyCell()` is the public entry point called by `fog_of_war.cpp`
+for every sky cell in the viewport each frame.
+It checks four layers in priority order and writes the winning ANSI sequence to the buffer:
+
+1. Sun glyph   — bright yellow (`\033[38;5;226m`), if the cell falls inside the 5×3 art
+2. Moon glyph  — bright white  (`\033[38;5;255m`), if the cell falls inside the 3×3 art
+3. Star        — white at night, grey at dawn/dusk, drawn at hash-selected positions
+4. Plain sky   — single space with background colour only
+
+`getSkyBg()` maps the current phase to an ANSI 256-colour background:
+
+- TIME_DAY   → `\033[48;5;39m`  (bright blue)
+- TIME_DUSK  → `\033[48;5;130m` (warm orange)
+- TIME_NIGHT → `\033[48;5;17m`  (dark navy)
+- TIME_DAWN  → `\033[48;5;95m`  (muted pink)
 
 **How coding elements are met:**
 
-- **Random events (Element 1):** Star placement uses a deterministic hash function (`isStarAt(row, col)`) with a 1/12 probability, ensuring the star field is random-looking but consistent across renders and save/load cycles.
+- **Random events (Element 1):**
+  Star placement uses `isStarAt(row, col)` — a standalone hash function
+  that combines row and column with prime multipliers (7919, 6271),
+  applies two XOR-shift passes and the MurmurHash2 constant,
+  then returns `true` when `(h % 12) == 0` (approximately 8.3% density).
+  Because the hash depends only on coordinates and not on `tickCount`,
+  the star field is perfectly stable across all frames and save/load cycles —
+  stars never flicker or shift position.
+  Star glyph selection (`. + * \``) also uses a small coordinate hash
+  so each star position always shows the same character.
 
-- **Data structures (Element 2):** Defines `TimeOfDay` enum (DAY, DUSK, NIGHT, DAWN) and phase transition constants (`CYCLE_LENGTH`, `DUSK_START`, etc.). Stores sun and moon ASCII art in constant pointer arrays (`SUN_ART`, `MOON_ART`). Uses global `tickCount` (declared extern in header, defined in cpp) to maintain cycle state across frames.
+- **Data structures (Element 2):**
+  Defines the `TimeOfDay` enum: `TIME_DAY`, `TIME_DUSK`, `TIME_NIGHT`, `TIME_DAWN`.
+  Phase boundaries are declared as `const int` in `day_night.h`:
+  `CYCLE_LENGTH = 6000`, `DUSK_START`, `NIGHT_START`, `DAWN_START`.
+  Sun and moon art are stored as `static const char*[]` arrays in `day_night.cpp`.
+  The star character palette is a `static const char[]` of four glyphs.
+  The global `tickCount` is a plain `int` — simple but sufficient,
+  since `getTimeOfDay()` always folds it with `% CYCLE_LENGTH`.
 
-- **Dynamic memory management (Element 3):** No dynamic allocation; all data is static constants or stack variables. The render functions write directly into the caller-supplied buffer pointer.
+- **Dynamic memory management (Element 3):**
+  No dynamic allocation occurs anywhere in this module.
+  All data is either static constants, stack-local variables,
+  or written directly into the caller-supplied `char* buf` pointer.
+  `renderSkyCell()` returns the byte count written so the caller can
+  advance its buffer position with a simple `pos += renderSkyCell(...)`.
 
-- **File I/O (Element 4):** Not implemented. The `tickCount` is persisted via `GameState` serialization handled by `fileio.cpp` during save/load.
+- **File I/O (Element 4):**
+  No file operations are performed.
+  `tickCount` is serialized by `fileio.cpp` as part of `GameState`
+  so the time of day is correctly restored on game load.
+  The sky colours and celestial positions then resume from the saved tick
+  automatically, with no special handling required in this module.
 
-- **Multiple files (Element 5):** Split across `day_night.h` (constants, enums, function declarations) and `day_night.cpp` (cycle logic, art rendering). Called by the main game loop (`tickDayCycle()`) and by `fog_of_war.cpp` (`renderSkyCell()`).
+- **Multiple files (Element 5):**
+  `day_night.h` declares all public constants, the `TimeOfDay` enum,
+  the `extern int tickCount` shared variable, and all five public functions:
+  `getTimeOfDay()`, `getTimeLabel()`, `getSkyBg()`, `tickDayCycle()`, `renderSkyCell()`.
+  `day_night.cpp` implements all of the above plus five internal helpers
+  declared `static`: `getSunCol()`, `getMoonCol()`, `getSunChar()`,
+  `getMoonChar()`, and `isStarAt()`.
+  The module is called from two sites: the main game loop calls `tickDayCycle()`
+  once per tick, and `fog_of_war.cpp` calls `renderSkyCell()` once per sky cell per frame.
 
-- **Difficulty levels (Element 6):** The cycle duration is constant across difficulties, but the Night phase (dark navy background with reduced visibility aesthetics) creates atmospheric tension that complements the mechanical difficulty of limited visibility radius in deep caves.
+- **Difficulty levels (Element 6):**
+  The day/night cycle length is constant across all difficulty settings.
+  However, the TIME_NIGHT phase (dark navy background, stars only)
+  creates atmospheric tension that complements the mechanical difficulty
+  of the reduced underground visibility radius in `fog_of_war.cpp`.
+  Players navigating deep caves at night face both limited sight radius
+  and a visually darker, more oppressive environment.
+  The DUSK and DAWN transitions also serve as soft timers,
+  giving the player visual cues that conditions are about to change.
 
 ---
 
