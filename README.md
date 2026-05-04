@@ -1200,7 +1200,7 @@ A logic and arithmetic-based minigame used during equipment progression in Termi
 
 - **Random events (Element 1):** Puzzle selection uses rand() seeded with current time to pick a random valid 4-number puzzle from the bank each time, ensuring every session feels unique.
 
-- **Storing data (Element 2):**
+- **Storing data (Element 2):** The TwentyFour class uses std::vector containers to manage game-related data. The card data for each round is stored in picked, and the puzzles are kept in allPuzzles, a 2D vector populated from twentyfourpuzzles.csv.
 
 - **Dynamic memory management (Element 3):** All puzzle storage and card vectors are allocated dynamically with std::vector. Memory is automatically cleaned up when the TwentyFour object is destroyed.
 
