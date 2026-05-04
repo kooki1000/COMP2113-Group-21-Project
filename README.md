@@ -17,7 +17,7 @@
 
 TermiCraft is a 2D text-based survival and mining game played entirely in the terminal. Each run generates a fresh ASCII world with surface terrain, underground layers, and ore deposits. Players mine resources to craft progressively stronger tools and armor, and some crafting tiers trigger minigames (Wordle, Minesweeper, TwentyFour, Sudoku). The goal is to reach the dragon cave, defeat the final boss, and finish with the highest score.
 
-## Video demo 
+## Video demo
 
 [Demo Link](https://connecthkuhk-my.sharepoint.com/:v:/g/personal/u3663602_connect_hku_hk/IQCt81M8rkMkRYQBxVnZdqKSAS_sefPqCBEr9zjzRP_1WAs?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=7SvDTx)
 
@@ -66,7 +66,7 @@ Implements the core player entity with real-time keyboard input handling (WASD m
 
 - **Data structures (Element 2):** Defines and manipulates `GameState` data containing `Position`, `Inventory`, `Equipment`, and mining/minigame state such as `pendingMinePos`, `pendingMineType`, and `currentMinigame`. Uses shared enums like `BlockType`, `MaterialTier`, and `MinigameType` to drive tool gating and minigame flow.
 
-- **Dynamic memory management (Element 3):** No manual `new`/`delete` is used. Inventory and state updates rely on value types in `GameState`, with `std::vector` used where the global game state needs dynamic collections.
+- **Dynamic memory management (Element 3):** Meets the requirement through runtime-sized containers: `GameState::enemies` is a `std::vector<Enemy>` that grows via `push_back` when `trySpawnEnemy()` creates a Cave Bug, so heap allocation happens on demand and is cleaned up automatically by RAII.
 
 - **File I/O (Element 4):** Integrates with the score system by calling `addScore()` from `score.h` upon successful mining, which delegates to `fileio` for persistent high score storage. Does not perform direct file operations, maintaining clean separation of concerns.
 
@@ -617,7 +617,7 @@ gameplay. First checks `if (rawPoints < 0) return` — a defensive guard
 preventing any negative call from modifying the score (zero is allowed through,
 which is harmless). Then computes:
 
-```
+```cpp
 state.score += static_cast<int>(rawPoints * state.settings.scoreMultiplier)
 ```
 
@@ -861,7 +861,7 @@ Increasing difficulty reduces initial information and increases constraint compl
 
 ---
 
-### Minesweeper Minigame ('minesweeper.cpp')
+### Minesweeper Minigame (`minesweeper.cpp`)
 
 A classic logic-based minigame triggered when players try to mine ores. The game dynamically generates a solvable minefield using random placement and provides real-time feedback through an ASCII board with numbered hints on adjacent mines, flagging, and flood-fill reveal mechanics. Players interact with the puzzle by typing an action (F - flag, R - reveal, Q - quit) and corresponding x y coordinates of the cell.
 
@@ -880,7 +880,7 @@ A classic logic-based minigame triggered when players try to mine ores. The game
   
 ---
 
-### Twentyfour Minigame ('twentyfour.cpp', 'evaluator.cpp')
+### Twentyfour Minigame (`twentyfour.cpp`, `evaluator.cpp`)
 
 A logic and arithmetic-based minigame used during equipment progression in TermiCraft. The player receives four cards and must use each value exactly once with +, -, *, / and parentheses to reach exactly 24.
 
